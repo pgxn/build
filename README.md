@@ -29,7 +29,7 @@ This project is distributed under the [PostgreSQL License][license].
   [docs]: https://docs.rs/pgxn_build "📚 Docs Status"
   [ci-badge]: https://github.com/pgxn/build/actions/workflows/test-and-lint.yml/badge.svg "🧪 Test and Lint"
   [ci]: https://github.com/pgxn/build/actions/workflows/test-and-lint "🧪 Test and Lint"
-  [cov-badge]: https://codecov.io/gh/pgxn/build/graph/badge.svg?token=5DOLLPIHEO "📊 Code Coverage"
+  [cov-badge]: https://codecov.io/gh/pgxn/build/graph/badge.svg?token=XnAe8omZ1J "📊 Code Coverage"
   [cov]: https://codecov.io/gh/pgxn/build "📊 Code Coverage"
   [deps-badge]: https://deps.rs/repo/github/pgxn/build/status.svg "⬆️ Dependency Status"
   [deps]: https://deps.rs/repo/github/pgxn/build "⬆️ Dependency Status"

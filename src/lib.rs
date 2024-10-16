@@ -7,45 +7,79 @@ This crate builds PGXN distributions for a variety of platforms and Postgres
 versions.
 
 */
-use thiserror::Error;
+pub mod error;
+mod pgrx;
+mod pgxs;
+mod pipeline;
 
-/// Build errors.
-#[derive(Error, Debug)]
-pub enum BuildError {
-    /// Errors configuring a build.
-    #[error("configuration failure")]
-    Configuration(),
+use crate::{error::BuildError, pgrx::Pgrx, pgxs::Pgxs, pipeline::Pipeline};
+use pgxn_meta::{dist, release::Release};
+
+/// Defines the types of builders.
+#[derive(Debug, PartialEq)]
+enum Build {
+    /// Defines a builder using the PGXS pipeline.
+    Pgxs(Pgxs),
+
+    /// Defines a builder using the pgrx pipeline.
+    Pgrx(Pgrx),
 }
 
-/// Defines the interface for downloading, configuring, building, and testing
-/// PGXN distributions.
-pub trait Builder {
-    /// Downloads a distribution.
-    fn download() -> Result<(), BuildError>;
+/// Builder builds PGXN releases.
+#[derive(Debug, PartialEq)]
+pub struct Builder(Build);
 
-    /// Unpacks a downloaded distribution.
-    fn unpack() -> Result<(), BuildError>;
+impl Builder {
+    /// Creates and returns a new builder using the appropriate pipeline.
+    pub fn new(meta: Release) -> Result<Self, BuildError> {
+        if let Some(deps) = meta.dependencies() {
+            if let Some(pipeline) = deps.pipeline() {
+                return match pipeline {
+                    dist::Pipeline::Pgxs => Ok(Builder(Build::Pgxs(Pgxs::new(meta)))),
+                    dist::Pipeline::Pgrx => Ok(Builder(Build::Pgrx(Pgrx::new(meta)))),
+                    _ => Err(BuildError::UnknownPipeline(pipeline.to_string())),
+                };
+            }
+        }
+        println!("HERE");
+        todo!("Detect pipeline");
+    }
 
-    /// Patches a distribution.
-    fn patch() -> Result<(), BuildError>;
+    /// Downloads a release.
+    pub fn download(&self) -> Result<(), BuildError> {
+        Ok(())
+    }
+
+    /// Unpacks a release.
+    pub fn unpack(&self) -> Result<(), BuildError> {
+        Ok(())
+    }
 
     /// Configures a distribution to build on a particular platform and
     /// Postgres version.
-    fn configure() -> Result<(), BuildError>;
+    pub fn configure(&self) -> Result<(), BuildError> {
+        match &self.0 {
+            Build::Pgxs(pgxs) => pgxs.configure(),
+            Build::Pgrx(pgrx) => pgrx.configure(),
+        }
+    }
 
     /// Compiles a distribution on a particular platform and Postgres version.
-    fn compile() -> Result<(), BuildError>;
+    pub fn compile(&self) -> Result<(), BuildError> {
+        match &self.0 {
+            Build::Pgxs(pgxs) => pgxs.compile(),
+            Build::Pgrx(pgrx) => pgrx.compile(),
+        }
+    }
 
     /// Tests a distribution a particular platform and Postgres version.
-    fn test() -> Result<(), BuildError>;
+    pub fn test(&self) -> Result<(), BuildError> {
+        match &self.0 {
+            Build::Pgxs(pgxs) => pgxs.test(),
+            Build::Pgrx(pgrx) => pgrx.test(),
+        }
+    }
 }
 
 #[cfg(test)]
-mod tests {
-    // use super::*;
-
-    #[test]
-    fn it_works() {
-        assert!(true == true);
-    }
-}
+mod tests;

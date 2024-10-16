@@ -4,4 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+pgxn_meta = "0.4"
 thiserror = "1.0"
+
+[dev-dependencies]
+serde_json = "1.0.128"

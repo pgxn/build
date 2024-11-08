@@ -1123,6 +1123,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "iri-string"
+version = "0.7.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc0f0a572e8ffe56e2ff4f769f32ffe919282c3916799f8b68688b6030063bea"
+dependencies = [
+ "memchr",
+ "serde",
+]
+
+[[package]]
 name = "itertools"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1402,6 +1412,7 @@ name = "pgxn_build"
 version = "0.1.0"
 dependencies = [
  "httpmock",
+ "iri-string",
  "pgxn_meta",
  "serde_json",
  "sha2",

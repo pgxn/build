@@ -29,9 +29,29 @@ pub enum BuildError {
     #[error("missing file name segment from {0}")]
     NoUrlFile(url::Url),
 
+    /// URL scheme Error.
+    #[error("unsupported URL scheme: {0}")]
+    Scheme(String),
+
     /// HTTP error.
     #[error(transparent)]
     Http(#[from] Box<ureq::Error>),
+
+    /// Serde JSON error.
+    #[error("invalid JSON: {0}")]
+    Serde(#[from] serde_json::Error),
+
+    /// Invalid type.
+    #[error("invalid type: {0} expected to be {1} but got {2}")]
+    Type(String, &'static str, &'static str),
+
+    /// URI Template error.
+    #[error(transparent)]
+    TemplateError(#[from] iri_string::template::Error),
+
+    /// UnknownURI Template.
+    #[error("unknown URI template: {0}")]
+    UnknownTemplate(String),
 }
 
 impl From<ureq::Error> for BuildError {

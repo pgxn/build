@@ -52,6 +52,10 @@ pub enum BuildError {
     /// UnknownURI Template.
     #[error("unknown URI template: {0}")]
     UnknownTemplate(String),
+
+    /// Unexpected data error.
+    #[error("{0}")]
+    Invalid(&'static str),
 }
 
 impl From<ureq::Error> for BuildError {

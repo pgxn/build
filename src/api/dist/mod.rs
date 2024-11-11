@@ -85,4 +85,45 @@ impl Dist {
     pub fn releases(&self) -> &Releases {
         self.releases.borrow()
     }
+
+    /// Finds and returns the best version to install, preferring the latest
+    /// stable version. If there are no stable versions, it tries to return
+    /// the latest testing version. If there are no testing versions, it
+    /// returns the latest unstable versions. Returns an error if there are no
+    /// versions at all.
+    pub fn best_version(&self) -> Result<&Version, BuildError> {
+        if let Some(v) = self.latest_stable_version() {
+            return Ok(v);
+        }
+        if let Some(v) = self.latest_testing_version() {
+            return Ok(v);
+        }
+        if let Some(v) = self.latest_unstable_version() {
+            return Ok(v);
+        }
+
+        Err(BuildError::Invalid("missing release data"))
+    }
+
+    /// Finds and returns the latest stable version.
+    pub fn latest_stable_version(&self) -> Option<&Version> {
+        latest_version(self.releases.stable())
+    }
+
+    /// Finds and returns the latest unstable version.
+    pub fn latest_unstable_version(&self) -> Option<&Version> {
+        latest_version(self.releases.unstable())
+    }
+
+    /// Finds and returns the latest testing version.
+    pub fn latest_testing_version(&self) -> Option<&Version> {
+        latest_version(self.releases.testing())
+    }
+}
+
+fn latest_version(releases: Option<&[Release]>) -> Option<&Version> {
+    match releases {
+        None => None,
+        Some(list) => Some(list[0].version()),
+    }
 }

@@ -1,4 +1,5 @@
 use super::*;
+use chrono::prelude::*;
 use serde_json::json;
 
 #[test]
@@ -100,6 +101,98 @@ fn dist() -> Result<(), BuildError> {
                         );
                     }
                 }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn mk_rel(v: &str) -> Release {
+    let date = Utc.with_ymd_and_hms(2024, 7, 20, 20, 34, 34).unwrap();
+    Release {
+        date,
+        version: Version::parse(v).unwrap(),
+    }
+}
+
+#[test]
+fn versions() -> Result<(), BuildError> {
+    for (name, releases) in [
+        (
+            "one stable",
+            Releases {
+                stable: Some(vec![mk_rel("0.1.2")]),
+                unstable: None,
+                testing: None,
+            },
+        ),
+        (
+            "two stables",
+            Releases {
+                stable: Some(vec![mk_rel("0.1.3"), mk_rel("0.1.2")]),
+                unstable: None,
+                testing: None,
+            },
+        ),
+        (
+            "one of each",
+            Releases {
+                stable: Some(vec![mk_rel("0.1.3")]),
+                unstable: Some(vec![mk_rel("0.2.0")]),
+                testing: Some(vec![mk_rel("0.1.4")]),
+            },
+        ),
+        (
+            "no stable",
+            Releases {
+                stable: None,
+                unstable: Some(vec![mk_rel("0.2.0"), mk_rel("0.1.0")]),
+                testing: Some(vec![mk_rel("0.1.4")]),
+            },
+        ),
+        (
+            "no stable or testing",
+            Releases {
+                stable: None,
+                unstable: Some(vec![mk_rel("0.2.0"), mk_rel("0.2.0-v1")]),
+                testing: None,
+            },
+        ),
+    ] {
+        let dist = Dist {
+            name: name.to_string(),
+            releases,
+        };
+        match &dist.releases.stable {
+            Some(list) => {
+                assert_eq!(&list[0].version, dist.latest_stable_version().unwrap());
+                assert_eq!(&list[0].version, dist.best_version().unwrap());
+            }
+            None => {
+                assert!(dist.latest_stable_version().is_none())
+            }
+        }
+        match &dist.releases.testing {
+            Some(list) => {
+                assert_eq!(&list[0].version, dist.latest_testing_version().unwrap());
+                if dist.releases.stable.is_none() {
+                    assert_eq!(&list[0].version, dist.best_version().unwrap());
+                }
+            }
+            None => {
+                assert!(dist.latest_testing_version().is_none())
+            }
+        }
+        match &dist.releases.unstable {
+            Some(list) => {
+                assert_eq!(&list[0].version, dist.latest_unstable_version().unwrap());
+                if dist.releases.stable.is_none() && dist.releases.testing.is_none() {
+                    assert_eq!(&list[0].version, dist.best_version().unwrap());
+                }
+            }
+            None => {
+                assert!(dist.latest_unstable_version().is_none())
             }
         }
     }

@@ -1,7 +1,7 @@
 use super::*;
 use httpmock::prelude::*;
-use io::Read;
 use sha2::{Digest, Sha256};
+use std::io::Read;
 use tempfile::tempdir;
 use ureq::json;
 
@@ -649,6 +649,22 @@ fn url_for_err() -> Result<(), BuildError> {
             Err(e) => assert_eq!(err.to_string(), e.to_string(), "{name}"),
             Ok(_) => panic!("Unexpected success for {name}"),
         };
+    }
+
+    Ok(())
+}
+
+#[test]
+fn dist() -> Result<(), BuildError> {
+    let url = format!("file://{}/", corpus_dir().display());
+    let api = Api::new(&url, None)?;
+    let dist = api.dist("pair")?;
+    assert_eq!("pair", dist.name());
+    assert_eq!(8, dist.releases().stable().unwrap().len());
+
+    match api.dist("nonesuch") {
+        Ok(_) => panic!("dist unexpectedly succeeded"),
+        Err(e) => assert!(e.to_string().contains("nonesuch.json: entity not found")),
     }
 
     Ok(())

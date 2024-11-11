@@ -1411,9 +1411,12 @@ dependencies = [
 name = "pgxn_build"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "httpmock",
  "iri-string",
  "pgxn_meta",
+ "semver",
+ "serde",
  "serde_json",
  "sha2",
  "tempfile",

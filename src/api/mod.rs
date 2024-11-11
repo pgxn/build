@@ -3,6 +3,9 @@
 Interface to local and remote PGXN mirrors and the PGXN API.
 
 */
+mod dist;
+pub use dist::{Dist, Release, Releases};
+
 use crate::error::BuildError;
 use iri_string::spec;
 use iri_string::template::{simple_context::SimpleContext, UriTemplateStr, UriTemplateString};
@@ -46,6 +49,15 @@ impl Api {
             agent,
             templates,
         })
+    }
+
+    /// Fetch the distribution release data for distribution `name`.
+    pub fn dist(&self, name: &str) -> Result<Dist, BuildError> {
+        let mut ctx = SimpleContext::new();
+        ctx.insert("dist", name);
+        let url = self.url_for("dist", ctx)?;
+        let read = fetch_reader(&self.agent, &url)?;
+        Dist::from_reader(read)
     }
 
     /// url_for finds the `name` template, evaluates with `ctx`, and returns a
@@ -166,6 +178,19 @@ fn fetch_json(agent: &ureq::Agent, url: &url::Url) -> Result<Value, BuildError> 
         "http" | "https" => Ok(serde_json::from_reader(
             agent.request_url("GET", url).call()?.into_reader(),
         )?),
+        s => Err(BuildError::Scheme(s.to_string())),
+    }
+}
+
+/// Fetches the JSON at URL and converts it to a serde_json::Value.
+fn fetch_reader(
+    agent: &ureq::Agent,
+    url: &url::Url,
+) -> Result<Box<dyn io::Read + Send + Sync + 'static>, BuildError> {
+    match url.scheme() {
+        "file" => Ok(Box::new(get_file(url)?)),
+        // Avoid .into_json(); it returns IO errors.
+        "http" | "https" => Ok(agent.request_url("GET", url).call()?.into_reader()),
         s => Err(BuildError::Scheme(s.to_string())),
     }
 }

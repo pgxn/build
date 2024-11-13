@@ -9,6 +9,7 @@ pub use dist::{Dist, Release, Releases};
 use crate::error::BuildError;
 use iri_string::spec;
 use iri_string::template::{simple_context::SimpleContext, UriTemplateStr, UriTemplateString};
+use semver::Version;
 use serde_json::{json, Value};
 use std::{collections::HashMap, fs::File, io, path::Path, time::Duration};
 use url::Url;
@@ -58,6 +59,28 @@ impl Api {
         let url = self.url_for("dist", ctx)?;
         let read = fetch_reader(&self.agent, &url)?;
         Dist::from_reader(read)
+    }
+
+    /// Fetch the distribution release metadata for distribution `name`
+    /// version `version`.
+    pub fn meta(
+        &self,
+        name: &str,
+        version: &Version,
+    ) -> Result<pgxn_meta::release::Release, BuildError> {
+        let mut ctx = SimpleContext::new();
+        ctx.insert("dist", name);
+        ctx.insert("version", version.to_string());
+        let url = self.url_for("meta", ctx)?;
+        let mut val = fetch_json(&self.agent, &url)?;
+        if val.get("meta-spec").is_none() {
+            // PGXN v1 stripped meta-spec out of this API :-/.
+            val.as_object_mut()
+                .unwrap()
+                .insert("meta-spec".to_string(), json!({"version": "1.0.0"}));
+        }
+        pgxn_meta::release::Release::try_from(val)
+            .map_err(|e| BuildError::InvalidMeta(e.to_string()))
     }
 
     /// url_for finds the `name` template, evaluates with `ctx`, and returns a

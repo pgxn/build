@@ -12,7 +12,7 @@ use crate::error::BuildError;
 #[cfg(test)]
 mod tests;
 
-/// Represents a single distribution release in [`Release`].
+/// Represents a single distribution release in [`Releases`].
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Release {
     version: Version,

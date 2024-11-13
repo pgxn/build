@@ -670,6 +670,19 @@ fn dist() -> Result<(), BuildError> {
     Ok(())
 }
 
+#[test]
+fn meta() -> Result<(), BuildError> {
+    let url = format!("file://{}/", corpus_dir().display());
+    let api = Api::new(&url, None)?;
+    let v = Version::parse("0.1.7").unwrap();
+    let dist = api.meta("pair", &v)?;
+    assert_eq!("pair", dist.name());
+    assert_eq!(&v, dist.version());
+    let sha = dist.release().digests().sha1().unwrap();
+    assert_eq!("5b9e3ba948b18703227e4dea17696c0f1d971759", hex::encode(sha));
+
+    Ok(())
+}
 fn files_eq<P: AsRef<Path>>(left: P, right: P) -> Result<(), io::Error> {
     let left = std::fs::read(left)?;
     let right = std::fs::read(right)?;

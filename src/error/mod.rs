@@ -56,6 +56,10 @@ pub enum BuildError {
     /// Unexpected data error.
     #[error("{0}")]
     Invalid(&'static str),
+
+    /// Unexpected pgxn_meta error.
+    #[error("{0}")]
+    InvalidMeta(String),
 }
 
 impl From<ureq::Error> for BuildError {

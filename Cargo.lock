@@ -1412,6 +1412,7 @@ name = "pgxn_build"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "hex",
  "httpmock",
  "iri-string",
  "pgxn_meta",

@@ -7,6 +7,7 @@ This crate builds PGXN distributions for a variety of platforms and Postgres
 versions.
 
 */
+pub mod api;
 pub mod error;
 mod pgrx;
 mod pgxs;

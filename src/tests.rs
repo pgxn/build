@@ -67,8 +67,8 @@ fn unsupported_pipeline() {
     let meta = release_meta("meson");
     let rel = Release::try_from(meta).unwrap();
     assert_eq!(
-        BuildError::UnknownPipeline("meson".to_string()),
-        Builder::new(rel).unwrap_err(),
+        BuildError::UnknownPipeline("meson".to_string()).to_string(),
+        Builder::new(rel).unwrap_err().to_string(),
     );
 }
 

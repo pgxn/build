@@ -66,7 +66,10 @@ fn download_file() -> Result<(), BuildError> {
     // Download the file.
     assert!(!exp_path.exists());
     let api = Api::new(&url, None)?;
-    api.download_to(tmp_dir.as_ref(), "pair", "0.1.7")?;
+    assert_eq!(
+        tmp_dir.path().join("pair-0.1.7.zip"),
+        api.download_to(tmp_dir.as_ref(), "pair", "0.1.7")?
+    );
     assert!(exp_path.exists());
 
     // Make sure it's the same file.
@@ -115,7 +118,10 @@ fn download_http() -> Result<(), BuildError> {
     let tmp_dir = tempdir()?;
     let exp_path = tmp_dir.as_ref().join("pair-0.1.7.zip");
     assert!(!exp_path.exists());
-    api.download_to(tmp_dir.as_ref(), "pair", "0.1.7")?;
+    assert_eq!(
+        exp_path,
+        api.download_to(tmp_dir.as_ref(), "pair", "0.1.7")?,
+    );
     assert!(exp_path.exists());
     mock.assert();
 
@@ -683,6 +689,44 @@ fn meta() -> Result<(), BuildError> {
 
     Ok(())
 }
+
+#[test]
+fn unpack() -> Result<(), BuildError> {
+    let dir = corpus_dir();
+    let url = format!("file://{}/", dir.display());
+    let api = Api::new(&url, None)?;
+    let tmp_dir = tempdir()?;
+    let zip = dir
+        .join("dist")
+        .join("pair")
+        .join("0.1.7")
+        .join("pair-0.1.7.zip");
+
+    // Test unpack.
+    let dir = api.unpack(tmp_dir.as_ref(), &zip)?;
+    let dst = tmp_dir.as_ref().join("pair-0.1.7");
+    assert_eq!(&dir, &dst);
+
+    // Check the contents.
+    for file in [
+        dst.join("README.md"),
+        dst.join("META.json"),
+        dst.join("Changes"),
+        dst.join("Makefile"),
+        dst.join("pair.control"),
+        dst.join("META.json"),
+        dst.join("doc").join("pair.md"),
+        dst.join("sql").join("pair.sql"),
+        dst.join("sql").join("pair--unpackaged--0.1.2.sql"),
+        dst.join("test").join("sql").join("base.sql"),
+        dst.join("test").join("expected").join("base.out"),
+    ] {
+        assert!(file.exists(), "{}", file.display());
+    }
+
+    Ok(())
+}
+
 fn files_eq<P: AsRef<Path>>(left: P, right: P) -> Result<(), io::Error> {
     let left = std::fs::read(left)?;
     let right = std::fs::read(right)?;

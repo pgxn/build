@@ -60,6 +60,10 @@ pub enum BuildError {
     /// Unexpected pgxn_meta error.
     #[error("{0}")]
     InvalidMeta(String),
+
+    /// Zip archive error.
+    #[error("{0}")]
+    Archive(#[from] zip::result::ZipError),
 }
 
 impl From<ureq::Error> for BuildError {

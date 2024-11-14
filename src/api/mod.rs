@@ -11,7 +11,13 @@ use iri_string::spec;
 use iri_string::template::{simple_context::SimpleContext, UriTemplateStr, UriTemplateString};
 use semver::Version;
 use serde_json::{json, Value};
-use std::{collections::HashMap, fs::File, io, path::Path, time::Duration};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 use url::Url;
 
 /// Interface to the PGXN API.
@@ -83,6 +89,19 @@ impl Api {
             .map_err(|e| BuildError::InvalidMeta(e.to_string()))
     }
 
+    /// Unpack download `file` in directory `into` and return the path to the
+    /// unpacked directory.
+    pub fn unpack<P: AsRef<Path>>(&self, into: P, file: P) -> Result<PathBuf, BuildError> {
+        let zip = File::open(file)?;
+        let mut archive = zip::ZipArchive::new(zip)?;
+        archive.extract(&into)?;
+        let first = archive
+            .by_index(0)?
+            .enclosed_name()
+            .ok_or_else(|| zip::result::ZipError::FileNotFound)?;
+        Ok(into.as_ref().join(first))
+    }
+
     /// url_for finds the `name` template, evaluates with `ctx`, and returns a
     /// [url::Url] relative to the base URL passed to new().
     fn url_for(&self, name: &str, ctx: SimpleContext) -> Result<url::Url, BuildError> {
@@ -95,13 +114,14 @@ impl Api {
         Ok(url)
     }
 
-    /// Download version `version` of `dist` to `dir`.
+    /// Download version `version` of `dist` to `dir`. Returns the full path
+    /// to the file.
     pub fn download_to<P: AsRef<Path>>(
         &self,
         dir: P,
         dist: &str,
         version: &str,
-    ) -> Result<(), BuildError> {
+    ) -> Result<PathBuf, BuildError> {
         let mut ctx = SimpleContext::new();
         ctx.insert("dist", dist);
         ctx.insert("version", version);
@@ -109,8 +129,13 @@ impl Api {
         self.download_url_to(dir, url)
     }
 
-    /// Download `url` to `dir`. The file name must be the last segment of the URL.
-    fn download_url_to<P: AsRef<Path>>(&self, dir: P, url: url::Url) -> Result<(), BuildError> {
+    /// Download `url` to `dir`. The file name must be the last segment of the
+    /// URL. Returns the full path to the file.
+    fn download_url_to<P: AsRef<Path>>(
+        &self,
+        dir: P,
+        url: url::Url,
+    ) -> Result<PathBuf, BuildError> {
         // Extract the file name from the URL.
         match url.path_segments() {
             None => Err(BuildError::NoUrlFile(url))?,
@@ -133,7 +158,7 @@ impl Api {
                                 e.kind(),
                             )),
                             Ok(mut out) => match io::copy(&mut input, &mut out) {
-                                Ok(_) => Ok(()),
+                                Ok(_) => Ok(dst),
                                 Err(e) => Err(BuildError::File(
                                     "copying",
                                     format!(
@@ -156,7 +181,7 @@ impl Api {
                             e.kind(),
                         )),
                         Ok(mut out) => match io::copy(&mut res.into_reader(), &mut out) {
-                            Ok(_) => Ok(()),
+                            Ok(_) => Ok(dst),
                             Err(e) => Err(BuildError::File(
                                 "copying",
                                 format!("from request to {}", dst.display()),

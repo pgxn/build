@@ -17,6 +17,7 @@ exclude = [ ".github", ".vscode", ".gitignore", ".ci", ".pre-*.yaml"]
 [dependencies]
 chrono = "0.4"
 iri-string = "0.7"
+log = { version = "0.4.22", features = ["kv"] }
 pgxn_meta = "0.5.1"
 semver = "1.0"
 serde = "1.0"

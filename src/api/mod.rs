@@ -9,6 +9,7 @@ pub use dist::{Dist, Release, Releases};
 use crate::error::BuildError;
 use iri_string::spec;
 use iri_string::template::{simple_context::SimpleContext, UriTemplateStr, UriTemplateString};
+use log::{debug, info, trace};
 use semver::Version;
 use serde_json::{json, Value};
 use std::{
@@ -19,6 +20,16 @@ use std::{
     time::Duration,
 };
 use url::Url;
+
+/// Returns a string representation of the final segment of a Path.
+macro_rules! filename {
+    ( $x:expr ) => {{
+        $x.as_ref()
+            .file_name()
+            .unwrap_or(std::ffi::OsStr::new("UNKNOWN"))
+            .to_string_lossy()
+    }};
+}
 
 /// Interface to the PGXN API.
 pub struct Api {
@@ -79,6 +90,7 @@ impl Api {
         ctx.insert("version", version.to_string());
         let url = self.url_for("meta", ctx)?;
         let mut val = fetch_json(&self.agent, &url)?;
+        debug!(url:display; "parsing");
         if val.get("meta-spec").is_none() {
             // PGXN v1 stripped meta-spec out of this API :-/.
             let val_type = type_of(&val);
@@ -93,6 +105,7 @@ impl Api {
     /// Unpack download `file` in directory `into` and return the path to the
     /// unpacked directory.
     pub fn unpack<P: AsRef<Path>>(&self, into: P, file: P) -> Result<PathBuf, BuildError> {
+        info!(file:display = filename!(file); "unpacking");
         let zip = File::open(file)?;
         let mut archive = zip::ZipArchive::new(zip)?;
         archive.extract(&into)?;
@@ -112,6 +125,7 @@ impl Api {
             .ok_or_else(|| BuildError::UnknownTemplate(name.to_string()))?;
         let path = template.expand::<spec::UriSpec, _>(&ctx)?;
         let url = self.url.join(&path.to_string())?;
+        trace!(url:display; "resolved URL");
         Ok(url)
     }
 
@@ -126,7 +140,9 @@ impl Api {
         ctx.insert("dist", meta.name());
         ctx.insert("version", meta.version().to_string());
         let url = self.url_for("download", ctx)?;
+        info!(url:display; "downloading");
         let file = self.download_url_to(dir, url)?;
+        info!(file:display = file.display(); "validating");
         meta.release().digests().validate(&file)?;
         Ok(file)
     }
@@ -138,6 +154,7 @@ impl Api {
         dir: P,
         url: url::Url,
     ) -> Result<PathBuf, BuildError> {
+        trace!( url:display, dir:display = dir.as_ref().display(); "downloading");
         // Extract the file name from the URL.
         match url.path_segments() {
             None => Err(BuildError::NoUrlFile(url))?,
@@ -222,6 +239,7 @@ fn type_of(v: &Value) -> &'static str {
 
 /// Fetches the JSON at URL and converts it to a serde_json::Value.
 fn fetch_json(agent: &ureq::Agent, url: &url::Url) -> Result<Value, BuildError> {
+    debug!(url:display; "fetching");
     match url.scheme() {
         "file" => Ok(serde_json::from_reader(get_file(url)?)?),
         // Avoid .into_json(); it returns IO errors.
@@ -237,6 +255,7 @@ fn fetch_reader(
     agent: &ureq::Agent,
     url: &url::Url,
 ) -> Result<Box<dyn io::Read + Send + Sync + 'static>, BuildError> {
+    debug!(url:display; "fetching");
     match url.scheme() {
         "file" => Ok(Box::new(get_file(url)?)),
         // Avoid .into_json(); it returns IO errors.

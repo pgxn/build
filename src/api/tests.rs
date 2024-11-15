@@ -60,15 +60,19 @@ fn constructor_proxy() -> Result<(), BuildError> {
 fn download_file() -> Result<(), BuildError> {
     let dir = corpus_dir();
     let url = format!("file://{}", dir.display());
-    let tmp_dir = tempdir()?;
-    let exp_path = tmp_dir.as_ref().join("pair-0.1.7.zip");
+
+    // Load the distribution release meta.
+    let api = Api::new(&url, None)?;
+    let v = Version::new(0, 1, 7);
+    let meta = api.meta("pair", &v)?;
 
     // Download the file.
+    let tmp_dir = tempdir()?;
+    let exp_path = tmp_dir.as_ref().join("pair-0.1.7.zip");
     assert!(!exp_path.exists());
-    let api = Api::new(&url, None)?;
     assert_eq!(
         tmp_dir.path().join("pair-0.1.7.zip"),
-        api.download_to(tmp_dir.as_ref(), "pair", "0.1.7")?
+        api.download_to(tmp_dir.as_ref(), &meta)?
     );
     assert!(exp_path.exists());
 
@@ -87,21 +91,10 @@ fn download_file() -> Result<(), BuildError> {
 #[test]
 fn download_http() -> Result<(), BuildError> {
     let dir = corpus_dir();
-    let src_path = dir
-        .join("dist")
-        .join("pair")
-        .join("0.1.7")
-        .join("pair-0.1.7.zip");
+    let src_path = dir.join("dist").join("pair").join("0.1.7");
 
     // Start a lightweight mock server.
     let server = MockServer::start();
-    let mock = server.mock(|when, then| {
-        when.method(GET).path("/dist/pair/0.1.7/pair-0.1.7.zip");
-        then.status(200)
-            .header("content-type", "application/zip")
-            .body_from_file(src_path.display().to_string());
-    });
-
     let idx_url = format!("file://{}/index.json", dir.display());
     let idx_url = Url::parse(&idx_url)?;
     let agent = ureq::agent();
@@ -114,16 +107,43 @@ fn download_http() -> Result<(), BuildError> {
         templates,
     };
 
+    // Load the distribution release meta.
+    let mock = server.mock(|when, then| {
+        when.method(GET).path("/dist/pair/0.1.7/META.json");
+        then.status(200)
+            .header("content-type", "application/json")
+            .body_from_file(src_path.join("META.json").display().to_string());
+    });
+    let v = Version::new(0, 1, 7);
+    let meta = api.meta("pair", &v)?;
+    mock.assert();
+
     // Download the file.
+    let mut mock = server.mock(|when, then| {
+        when.method(GET).path("/dist/pair/0.1.7/pair-0.1.7.zip");
+        then.status(200)
+            .header("content-type", "application/zip")
+            .body_from_file(src_path.join("pair-0.1.7.zip").display().to_string());
+    });
     let tmp_dir = tempdir()?;
     let exp_path = tmp_dir.as_ref().join("pair-0.1.7.zip");
     assert!(!exp_path.exists());
-    assert_eq!(
-        exp_path,
-        api.download_to(tmp_dir.as_ref(), "pair", "0.1.7")?,
-    );
+    assert_eq!(exp_path, api.download_to(tmp_dir.as_ref(), &meta)?);
     assert!(exp_path.exists());
     mock.assert();
+    mock.delete();
+
+    // Try a validation failure.
+    let mock = server.mock(|when, then| {
+        when.method(GET).path("/dist/pair/0.1.7/pair-0.1.7.zip");
+        then.status(200)
+            .header("content-type", "application/zip")
+            .body_from_file(src_path.join("META.json").display().to_string());
+    });
+    let res = api.download_to(tmp_dir.as_ref(), &meta);
+    mock.assert();
+    assert!(res.is_err());
+    assert_eq!("SHA-1 digest cafa55f06cdc9861b23de72687024b02322ad21c does not match 5b9e3ba948b18703227e4dea17696c0f1d971759", res.unwrap_err().to_string());
 
     Ok(())
 }
@@ -691,6 +711,62 @@ fn meta() -> Result<(), BuildError> {
 }
 
 #[test]
+fn meta_err() -> Result<(), BuildError> {
+    // Start a lightweight mock server.
+    let server = MockServer::start();
+    let base_url = Url::parse(&server.base_url())?;
+
+    // Load the URL templates.
+    let idx_url = format!("file://{}/index.json", corpus_dir().display());
+    let idx_url = Url::parse(&idx_url)?;
+    let agent = ureq::agent();
+    let templates = fetch_templates(&agent, &idx_url)?;
+
+    // Set up an Api.
+    let api = Api {
+        url: base_url.clone(),
+        agent,
+        templates,
+    };
+
+    // Test an invalid META file json value.
+    let mock = server.mock(|when, then| {
+        when.method(GET).path("/dist/bad_meta/0.0.1/META.json");
+        then.status(200)
+            .header("content-type", "application/json")
+            .body("[]");
+    });
+    let v = Version::parse("0.0.1").unwrap();
+    let meta = api.meta("bad_meta", &v);
+    mock.assert();
+    assert!(meta.is_err());
+    assert_eq!(
+        format!(
+            "invalid type: {} expected to be object but got array",
+            base_url.join("dist/bad_meta/0.0.1/META.json")?,
+        ),
+        meta.unwrap_err().to_string()
+    );
+
+    // Test an invalid META file json value.
+    let mock = server.mock(|when, then| {
+        when.method(GET).path("/dist/invalid_meta/0.0.1/META.json");
+        then.status(200)
+            .header("content-type", "application/json")
+            .body("{}");
+    });
+    let meta = api.meta("invalid_meta", &v);
+    mock.assert();
+    assert!(meta.is_err());
+    assert!(meta
+        .unwrap_err()
+        .to_string()
+        .contains("missing properties 'name', 'version', 'abstract'"));
+
+    Ok(())
+}
+
+#[test]
 fn unpack() -> Result<(), BuildError> {
     let dir = corpus_dir();
     let url = format!("file://{}/", dir.display());
@@ -723,6 +799,15 @@ fn unpack() -> Result<(), BuildError> {
     ] {
         assert!(file.exists(), "{}", file.display());
     }
+
+    // Test an invalid zip file.
+    let idx = corpus_dir().join("index.json");
+    let res = api.unpack(tmp_dir.as_ref(), &idx);
+    assert!(res.is_err());
+    assert_eq!(
+        "invalid Zip archive: No valid central directory found",
+        res.unwrap_err().to_string()
+    );
 
     Ok(())
 }

@@ -58,8 +58,8 @@ pub enum BuildError {
     Invalid(&'static str),
 
     /// Unexpected pgxn_meta error.
-    #[error("{0}")]
-    InvalidMeta(String),
+    #[error(transparent)]
+    InvalidMeta(#[from] pgxn_meta::error::Error),
 
     /// Zip archive error.
     #[error("{0}")]

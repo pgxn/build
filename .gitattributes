@@ -1,1 +1,3 @@
-/Cargo.lock -diff
+# Disable line-ending conversion of JSON files, so that the hash digest
+# validation tests pass on Windows.
+*.json         -text

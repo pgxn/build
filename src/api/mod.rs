@@ -81,12 +81,13 @@ impl Api {
         let mut val = fetch_json(&self.agent, &url)?;
         if val.get("meta-spec").is_none() {
             // PGXN v1 stripped meta-spec out of this API :-/.
+            let val_type = type_of(&val);
             val.as_object_mut()
-                .unwrap()
+                .ok_or_else(|| BuildError::Type(url.to_string(), "object", val_type))?
                 .insert("meta-spec".to_string(), json!({"version": "1.0.0"}));
         }
-        pgxn_meta::release::Release::try_from(val)
-            .map_err(|e| BuildError::InvalidMeta(e.to_string()))
+        let rel = pgxn_meta::release::Release::try_from(val)?;
+        Ok(rel)
     }
 
     /// Unpack download `file` in directory `into` and return the path to the
@@ -114,19 +115,20 @@ impl Api {
         Ok(url)
     }
 
-    /// Download version `version` of `dist` to `dir`. Returns the full path
-    /// to the file.
+    /// Download the archive for release `meta` to `dir` and validate it
+    /// against the digests in `meta`. Returns the full path to the file.
     pub fn download_to<P: AsRef<Path>>(
         &self,
         dir: P,
-        dist: &str,
-        version: &str,
+        meta: &pgxn_meta::release::Release,
     ) -> Result<PathBuf, BuildError> {
         let mut ctx = SimpleContext::new();
-        ctx.insert("dist", dist);
-        ctx.insert("version", version);
+        ctx.insert("dist", meta.name());
+        ctx.insert("version", meta.version().to_string());
         let url = self.url_for("download", ctx)?;
-        self.download_url_to(dir, url)
+        let file = self.download_url_to(dir, url)?;
+        meta.release().digests().validate(&file)?;
+        Ok(file)
     }
 
     /// Download `url` to `dir`. The file name must be the last segment of the

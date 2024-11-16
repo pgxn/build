@@ -31,6 +31,29 @@ macro_rules! filename {
     }};
 }
 
+macro_rules! copy_err {
+    ($x:expr, $y:expr, $z:expr) => {{
+        Err(BuildError::File(
+            "copying",
+            format!("from {} to {}", $x, $y.display()),
+            $z.kind(),
+        ))
+    }};
+}
+
+macro_rules! type_of {
+    ( $x:expr ) => {{
+        match $x {
+            Value::Array(_) => "array",
+            Value::Bool(_) => "boolean",
+            Value::Null => "null",
+            Value::Number(_) => "number",
+            Value::Object(_) => "object",
+            Value::String(_) => "string",
+        }
+    }};
+}
+
 /// Interface to the PGXN API.
 pub struct Api {
     url: url::Url,
@@ -93,7 +116,7 @@ impl Api {
         debug!(url:display; "parsing");
         if val.get("meta-spec").is_none() {
             // PGXN v1 stripped meta-spec out of this API :-/.
-            let val_type = type_of(&val);
+            let val_type = type_of!(val);
             val.as_object_mut()
                 .ok_or_else(|| BuildError::Type(url.to_string(), "object", val_type))?
                 .insert("meta-spec".to_string(), json!({"version": "1.0.0"}));
@@ -158,58 +181,46 @@ impl Api {
         // Extract the file name from the URL.
         match url.path_segments() {
             None => Err(BuildError::NoUrlFile(url))?,
-            Some(segments) => match segments.last() {
-                None => Err(BuildError::NoUrlFile(url))?,
-                Some(filename) => {
-                    if filename.is_empty() {
-                        return Err(BuildError::NoUrlFile(url));
-                    }
-                    let dst = dir.as_ref().join(filename);
+            Some(segments) => {
+                // When Some is returned, the iterator always contains at
+                // least one string (which may be empty).
+                let filename = segments.last().unwrap();
+                if filename.is_empty() {
+                    return Err(BuildError::NoUrlFile(url));
+                }
+                let dst = dir.as_ref().join(filename);
 
-                    if url.scheme() == "file" {
-                        // Copy the file. Eschew std::fs::copy for better
-                        // error messages.
-                        let mut input = get_file(&url)?;
-                        return match File::create(&dst) {
-                            Err(e) => Err(BuildError::File(
-                                "creating",
-                                dst.display().to_string(),
-                                e.kind(),
-                            )),
-                            Ok(mut out) => match io::copy(&mut input, &mut out) {
-                                Ok(_) => Ok(dst),
-                                Err(e) => Err(BuildError::File(
-                                    "copying",
-                                    format!(
-                                        "from {} to {}",
-                                        url.to_file_path().unwrap().display(),
-                                        dst.display()
-                                    ),
-                                    e.kind(),
-                                )),
-                            },
-                        };
-                    }
-
-                    // Download the file over HTTP.
-                    let res = self.agent.request_url("GET", &url).call()?;
-                    match File::create(&dst) {
+                if url.scheme() == "file" {
+                    // Copy the file. Eschew std::fs::copy for better
+                    // error messages.
+                    let mut input = get_file(&url)?;
+                    return match File::create(&dst) {
                         Err(e) => Err(BuildError::File(
-                            "create",
+                            "creating",
                             dst.display().to_string(),
                             e.kind(),
                         )),
-                        Ok(mut out) => match io::copy(&mut res.into_reader(), &mut out) {
+                        Ok(mut out) => match io::copy(&mut input, &mut out) {
                             Ok(_) => Ok(dst),
-                            Err(e) => Err(BuildError::File(
-                                "copying",
-                                format!("from request to {}", dst.display()),
-                                e.kind(),
-                            )),
+                            Err(e) => copy_err!(url.to_file_path().unwrap().display(), dst, e),
                         },
-                    }
+                    };
                 }
-            },
+
+                // Download the file over HTTP.
+                let res = self.agent.request_url("GET", &url).call()?;
+                match File::create(&dst) {
+                    Err(e) => Err(BuildError::File(
+                        "creating",
+                        dst.display().to_string(),
+                        e.kind(),
+                    )),
+                    Ok(mut out) => match io::copy(&mut res.into_reader(), &mut out) {
+                        Ok(_) => Ok(dst),
+                        Err(e) => copy_err!(url, dst, e),
+                    },
+                }
+            }
         }
     }
 }
@@ -222,18 +233,6 @@ fn parse_base_url(url: &str) -> Result<url::Url, url::ParseError> {
     } else {
         let url = format!("{url}/");
         Url::parse(&url)
-    }
-}
-
-/// type_of returns a the type of `v`.
-fn type_of(v: &Value) -> &'static str {
-    match v {
-        Value::Array(_) => "array",
-        Value::Bool(_) => "boolean",
-        Value::Null => "null",
-        Value::Number(_) => "number",
-        Value::Object(_) => "object",
-        Value::String(_) => "string",
     }
 }
 
@@ -297,7 +296,7 @@ fn fetch_templates(
     let val = fetch_json(agent, url)?;
     let obj = val
         .as_object()
-        .ok_or_else(|| BuildError::Type(url.to_string(), "object", type_of(&val)))?;
+        .ok_or_else(|| BuildError::Type(url.to_string(), "object", type_of!(val)))?;
 
     let mut map: HashMap<String, UriTemplateString> = HashMap::with_capacity(obj.len());
     for (k, v) in obj.into_iter() {
@@ -305,7 +304,7 @@ fn fetch_templates(
             BuildError::Type(
                 format!("template {} in {}", json!(k), url),
                 "string",
-                type_of(&val),
+                type_of!(val),
             )
         })?;
 

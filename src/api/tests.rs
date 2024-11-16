@@ -149,40 +149,41 @@ fn download_http() -> Result<(), BuildError> {
 }
 
 #[test]
-fn download_errors() -> Result<(), BuildError> {
+fn download_file_errors() -> Result<(), BuildError> {
     let dir = corpus_dir();
     let url = format!("file://{}", corpus_dir().display());
     let api = Api::new(&url, None)?;
     let dst = dir.join("nope");
+    let tmp = tempdir()?;
 
     for (name, dir, url, err) in [
         (
             "no segments",
-            &dst,
+            dst.as_path(),
             "data:text/plain,HelloWorld".to_string(),
             "missing file name segment from data:text/plain,HelloWorld".to_string(),
         ),
         (
             "empty segments",
-            &dst,
+            dst.as_path(),
             "http://example.com".to_string(),
             "missing file name segment from http://example.com/".to_string(),
         ),
         (
             "not tls",
-            &dst,
+            dst.as_path(),
             "http://example.com/foo.text".to_string(),
             "http://example.com/foo.text: Insecure request attempted with https_only set: can't perform non https request with https_only set".to_string(),
         ),
         (
             "nonexistent file",
-            &dst,
+            dst.as_path(),
             format!("file://{}", dir.join("nope.txt").display()),
             format!("opening {}: {}", dir.join("nope.txt").display(), io::ErrorKind::NotFound),
         ),
         (
             "nonexistent destination",
-            &dst,
+            dst.as_path(),
             format!("file://{}", dir.join("index.json").display()),
             format!(
                 "creating {}: {}",
@@ -190,10 +191,94 @@ fn download_errors() -> Result<(), BuildError> {
                 io::ErrorKind::NotFound
             ),
         ),
+        (
+            "directory source",
+            tmp.as_ref(),
+            format!("file://{}", dir.join("dist").display()),
+            if cfg!(windows) {
+                format!(
+                    "opening {}: {}",
+                    dir.join("dist").display(),
+                    io::ErrorKind::PermissionDenied,
+                )
+            } else {
+                format!(
+                    "copying from {} to {}: {}",
+                    dir.join("dist").display(),
+                    tmp.as_ref().join("dist").display(),
+                    "is a directory", // io::ErrorKind::IsADirectory,
+                )
+            },
+        ),
     ] {
-        match api.download_url_to(dir.clone(), Url::parse(&url)?) {
+        match api.download_url_to(dir, Url::parse(&url)?) {
             Ok(_) => panic!("{name} unexpectedly succeeded"),
             Err(e) => assert_eq!(err, e.to_string(), "{name}"),
+        }
+    }
+
+    Ok(())
+}
+
+#[test]
+fn download_http_errors() -> Result<(), BuildError> {
+    let dir = corpus_dir();
+    let dst = dir.join("nope");
+    // let tmp = tempdir()?;
+
+    // Start a lightweight mock server.
+    let server = MockServer::start();
+    let base_url = Url::parse(&server.url("/"))?;
+    let idx_url = format!("file://{}/index.json", dir.display());
+    let idx_url = Url::parse(&idx_url)?;
+    let agent = ureq::agent();
+    let templates = fetch_templates(&agent, &idx_url)?;
+
+    // Create a client and disable TLS.
+    let api = Api {
+        url: Url::parse(&server.url("/"))?,
+        agent,
+        templates,
+    };
+
+    for (name, dir, url, mock, err) in [
+        (
+            "nonexistent destination",
+            dst.as_path(),
+            base_url.join("index.txt")?,
+            server.mock(|when, then| {
+                when.method(GET).path("/index.txt");
+                then.status(200).body("hello");
+            }),
+            format!(
+                "creating {}: {}",
+                dst.join("index.txt").display(),
+                io::ErrorKind::NotFound,
+            ),
+        ),
+        // No way to get ureq.Response.into_reader to return a useless reader.
+        // (
+        //     "nonexistent source",
+        //     tmp.as_ref(),
+        //     base_url.join("empty.txt")?,
+        //     server.mock(|when, then| {
+        //         when.method(GET).path("/empty.txt");
+        //         then.status(200);
+        //     }),
+        //     format!(
+        //         "copying {} to {}: {}",
+        //         base_url.join("index.txt")?,
+        //         tmp.as_ref().join("empty.txt").display(),
+        //         io::ErrorKind::NotFound,
+        //     ),
+        // ),
+    ] {
+        match api.download_url_to(dir, url) {
+            Ok(_) => panic!("{name} unexpectedly succeeded"),
+            Err(e) => {
+                assert_eq!(err, e.to_string(), "{name}");
+                mock.assert();
+            }
         }
     }
 
@@ -210,7 +295,7 @@ fn type_of_fn() {
         ("object", json!({})),
         ("array", json!([])),
     ] {
-        assert_eq!(exp, type_of(&val), "{exp}");
+        assert_eq!(exp, type_of!(val), "{exp}");
     }
 }
 #[test]
@@ -269,13 +354,78 @@ fn get_file_err() -> Result<(), BuildError> {
 #[test]
 fn fetch_json_file() -> Result<(), BuildError> {
     // Test with index.json.
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("corpus");
+    let dir = corpus_dir();
     let url = format!("file://{}/index.json", dir.display());
     let url = Url::parse(&url)?;
 
     let agent = ureq::agent();
     let json = fetch_json(&agent, &url)?;
     assert_eq!(index_json(), json);
+
+    Ok(())
+}
+
+#[test]
+fn fetch_reader_fn() -> Result<(), BuildError> {
+    // Fetch via file://.
+    let dir = corpus_dir();
+    let url = format!("file://{}/index.json", dir.display());
+    let url = Url::parse(&url)?;
+    let agent = ureq::agent();
+    let json = fetch_reader(&agent, &url)?;
+    let json: Value = serde_json::from_reader(json)?;
+    assert_eq!(index_json(), json);
+
+    // Fail fetch via file://.
+    let url = format!("file://{}/nonesuch.txt", dir.display());
+    let url = Url::parse(&url)?;
+    match fetch_reader(&agent, &url) {
+        Ok(_) => panic!("404 unexpectedly succeeded"),
+        Err(e) => assert_eq!(
+            format!(
+                "opening {}: {}",
+                dir.join("nonesuch.txt").display(),
+                io::ErrorKind::NotFound
+            ),
+            e.to_string(),
+            "404"
+        ),
+    }
+
+    // Fetch via http://.
+    let server = MockServer::start();
+    let mock = server.mock(|when, then| {
+        when.method(GET).path("/some.json");
+        then.status(200)
+            .header("content-type", "text/plain")
+            .body("greetings");
+    });
+
+    let url = Url::parse(&server.url("/some.json"))?;
+    let read = fetch_reader(&agent, &url)?;
+    assert_eq!("greetings", std::io::read_to_string(read)?);
+    mock.assert();
+
+    // Fail fetch via http://
+    let mock = server.mock(|when, then| {
+        when.method(GET).path("/nonesuch.json");
+        then.status(404)
+            .header("content-type", "text/plain")
+            .body("not found");
+    });
+    let url = Url::parse(&server.url("/nonesuch.json"))?;
+    match fetch_reader(&agent, &url) {
+        Ok(_) => panic!("404 unexpectedly succeeded"),
+        Err(e) => assert_eq!(format!("{url}: status code 404"), e.to_string(), "404"),
+    }
+    mock.assert();
+
+    // Try unsupported scheme.
+    let url = Url::parse("ftp://hi")?;
+    match fetch_reader(&agent, &url) {
+        Ok(_) => panic!("ftp unexpectedly succeeded"),
+        Err(e) => assert_eq!("unsupported URL scheme: ftp", e.to_string(), "ftp"),
+    }
 
     Ok(())
 }
@@ -329,6 +479,7 @@ fn fetch_json_http() -> Result<(), BuildError> {
         Err(e) => assert_eq!(exp, e.to_string(), "404"),
     }
     mock.assert();
+
     Ok(())
 }
 

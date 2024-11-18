@@ -3,7 +3,7 @@
 [![license-badge]][license] [![crates-badge]][crates] [![release-badge]][release] [![ci-badge]][ci] [![cov-badge]][cov] [![docs-badge]][docs] [![deps-badge]][deps]
 
 **The pgxn_build crate builds [PGXN] distributions on a variety of platforms
-and Postgres versions.
+and Postgres versions.**
 
 ---
 
@@ -36,6 +36,7 @@ This project is distributed under the [PostgreSQL License][license].
   [release-badge]: https://img.shields.io/github/release/pgxn/build.svg  "🚀 Latest Release"
   [release]: https://github.com/pgxn/build/releases/latest "🚀 Latest Release"
   [PGXN]: https://pgxn.org "PGXN: PostgreSQL Extension Network"
+  [PostgresSQL Code of Conduct]: https://www.postgresql.org/about/policies/coc/
   [`pgxn_build` docs on docs.rs]: https://docs.rs/ubi/latest/pgxn_build/
   [Issues]: https://github.com/pgxn/build/issues
   [Pull Requests]: https://github.com/pgxn/build/pulls

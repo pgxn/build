@@ -33,13 +33,15 @@ fn release_meta(pipeline: &str) -> Value {
 fn pgxs() {
     // Test pgxs pipeline.
     let meta = release_meta("pgxs");
+    let dir = Path::new("dir");
     let rel = Release::try_from(meta.clone()).unwrap();
-    let builder = Builder::new(rel).unwrap();
+    let builder = Builder::new(dir, rel).unwrap();
     let rel = Release::try_from(meta).unwrap();
-    let exp = Builder(Build::Pgxs(Pgxs::new(rel)));
+    let exp = Builder {
+        pipeline: Build::Pgxs(Pgxs::new(dir.to_path_buf(), true)),
+        meta: rel,
+    };
     assert_eq!(exp, builder, "pgxs");
-    assert!(builder.download().is_ok());
-    assert!(builder.unpack().is_ok());
     assert!(builder.configure().is_ok());
     assert!(builder.compile().is_ok());
     assert!(builder.test().is_ok());
@@ -49,13 +51,15 @@ fn pgxs() {
 fn pgrx() {
     // Test pgrx pipeline.
     let meta = release_meta("pgrx");
+    let dir = Path::new("dir");
     let rel = Release::try_from(meta.clone()).unwrap();
-    let builder = Builder::new(rel).unwrap();
+    let builder = Builder::new(dir, rel).unwrap();
     let rel = Release::try_from(meta).unwrap();
-    let exp = Builder(Build::Pgrx(Pgrx::new(rel)));
+    let exp = Builder {
+        pipeline: Build::Pgrx(Pgrx::new(dir.to_path_buf(), true)),
+        meta: rel,
+    };
     assert_eq!(exp, builder, "pgrx");
-    assert!(builder.download().is_ok());
-    assert!(builder.unpack().is_ok());
     assert!(builder.configure().is_ok());
     assert!(builder.compile().is_ok());
     assert!(builder.test().is_ok());
@@ -68,7 +72,7 @@ fn unsupported_pipeline() {
     let rel = Release::try_from(meta).unwrap();
     assert_eq!(
         BuildError::UnknownPipeline("meson".to_string()).to_string(),
-        Builder::new(rel).unwrap_err().to_string(),
+        Builder::new("dir", rel).unwrap_err().to_string(),
     );
 }
 
@@ -79,7 +83,7 @@ fn detect_pipeline() {
     let mut meta = release_meta("");
     meta.as_object_mut().unwrap().remove("dependencies");
     let rel = Release::try_from(meta).unwrap();
-    _ = Builder::new(rel);
+    _ = Builder::new("dir", rel);
 }
 
 #[test]
@@ -98,5 +102,5 @@ fn no_pipeline() {
     deps.remove("pipeline");
     deps.insert("postgres".to_string(), json!({"version": "14"}));
     let rel = Release::try_from(meta).unwrap();
-    _ = Builder::new(rel);
+    _ = Builder::new("dir", rel);
 }

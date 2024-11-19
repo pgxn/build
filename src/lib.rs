@@ -15,6 +15,7 @@ mod pipeline;
 
 use crate::{error::BuildError, pgrx::Pgrx, pgxs::Pgxs, pipeline::Pipeline};
 use pgxn_meta::{dist, release::Release};
+use std::path::Path;
 
 /// Defines the types of builders.
 #[derive(Debug, PartialEq)]
@@ -28,38 +29,36 @@ enum Build {
 
 /// Builder builds PGXN releases.
 #[derive(Debug, PartialEq)]
-pub struct Builder(Build);
+pub struct Builder {
+    pipeline: Build,
+    meta: Release,
+}
 
 impl Builder {
     /// Creates and returns a new builder using the appropriate pipeline.
-    pub fn new(meta: Release) -> Result<Self, BuildError> {
-        if let Some(deps) = meta.dependencies() {
-            if let Some(pipeline) = deps.pipeline() {
-                return match pipeline {
-                    dist::Pipeline::Pgxs => Ok(Builder(Build::Pgxs(Pgxs::new(meta)))),
-                    dist::Pipeline::Pgrx => Ok(Builder(Build::Pgrx(Pgrx::new(meta)))),
-                    _ => Err(BuildError::UnknownPipeline(pipeline.to_string())),
-                };
+    pub fn new<P: AsRef<Path>>(dir: P, meta: Release) -> Result<Self, BuildError> {
+        let pipeline = if let Some(deps) = meta.dependencies() {
+            if let Some(pipe) = deps.pipeline() {
+                let dir = dir.as_ref().to_path_buf();
+                match pipe {
+                    dist::Pipeline::Pgxs => Build::Pgxs(Pgxs::new(dir, true)),
+                    dist::Pipeline::Pgrx => Build::Pgrx(Pgrx::new(dir, true)),
+                    _ => return Err(BuildError::UnknownPipeline(pipe.to_string())),
+                }
+            } else {
+                todo!("Detect pipeline");
             }
-        }
-        println!("HERE");
-        todo!("Detect pipeline");
-    }
+        } else {
+            todo!("Detect pipeline");
+        };
 
-    /// Downloads a release.
-    pub fn download(&self) -> Result<(), BuildError> {
-        Ok(())
-    }
-
-    /// Unpacks a release.
-    pub fn unpack(&self) -> Result<(), BuildError> {
-        Ok(())
+        Ok(Builder { pipeline, meta })
     }
 
     /// Configures a distribution to build on a particular platform and
     /// Postgres version.
     pub fn configure(&self) -> Result<(), BuildError> {
-        match &self.0 {
+        match &self.pipeline {
             Build::Pgxs(pgxs) => pgxs.configure(),
             Build::Pgrx(pgrx) => pgrx.configure(),
         }
@@ -67,7 +66,7 @@ impl Builder {
 
     /// Compiles a distribution on a particular platform and Postgres version.
     pub fn compile(&self) -> Result<(), BuildError> {
-        match &self.0 {
+        match &self.pipeline {
             Build::Pgxs(pgxs) => pgxs.compile(),
             Build::Pgrx(pgrx) => pgrx.compile(),
         }
@@ -75,7 +74,7 @@ impl Builder {
 
     /// Tests a distribution a particular platform and Postgres version.
     pub fn test(&self) -> Result<(), BuildError> {
-        match &self.0 {
+        match &self.pipeline {
             Build::Pgxs(pgxs) => pgxs.test(),
             Build::Pgrx(pgrx) => pgrx.test(),
         }

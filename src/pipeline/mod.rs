@@ -1,13 +1,13 @@
 //! Build Pipeline interface definition.
 
 use crate::error::BuildError;
-use pgxn_meta::release::Release;
+use std::path::PathBuf;
 
 /// Defines the interface for build pipelines to configure, compile, and test
 /// PGXN distributions.
 pub(crate) trait Pipeline {
     /// Creates an instance of a Builder.
-    fn new(meta: Release) -> Self;
+    fn new(dir: PathBuf, sudo: bool) -> Self;
 
     /// Configures a distribution to build on a particular platform and
     /// Postgres version.

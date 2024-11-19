@@ -4,20 +4,22 @@
 
 use crate::error::BuildError;
 use crate::pipeline::Pipeline;
-use pgxn_meta::release::Release;
+use std::path::PathBuf;
 
 /// Builder implementation for [pgrx] Pipelines.
 ///
 /// [pgrx]: https://github.com/pgcentralfoundation/pgrx
 #[derive(Debug, PartialEq)]
 pub(crate) struct Pgrx {
-    meta: Release,
+    dir: PathBuf,
+    sudo: bool,
 }
 
 impl Pipeline for Pgrx {
-    fn new(meta: Release) -> Self {
-        Pgrx { meta }
+    fn new(dir: PathBuf, sudo: bool) -> Self {
+        Pgrx { dir, sudo }
     }
+
     fn configure(&self) -> Result<(), BuildError> {
         Ok(())
     }

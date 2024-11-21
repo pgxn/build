@@ -13,6 +13,10 @@ pub enum BuildError {
     #[error("unknown build pipeline `{0}`")]
     UnknownPipeline(String),
 
+    /// Unable to detect the pipeline.
+    #[error("cannot detect build pipeline and none specified")]
+    NoPipeline(),
+
     /// IO error.
     #[error(transparent)]
     Io(#[from] io::Error),

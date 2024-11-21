@@ -15,7 +15,7 @@ mod pipeline;
 
 use crate::{error::BuildError, pgrx::Pgrx, pgxs::Pgxs, pipeline::Pipeline};
 use pgxn_meta::{dist, release::Release};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Defines the types of builders.
 #[derive(Debug, PartialEq)]
@@ -27,6 +27,46 @@ enum Build {
     Pgrx(Pgrx),
 }
 
+impl Build {
+    /// Returns a build pipeline identified by `pipe`, or an error if `pipe`
+    /// is unknown.
+    fn new(pipe: &dist::Pipeline, dir: PathBuf, sudo: bool) -> Result<Build, BuildError> {
+        match pipe {
+            dist::Pipeline::Pgxs => Ok(Build::Pgxs(Pgxs::new(dir, sudo))),
+            dist::Pipeline::Pgrx => Ok(Build::Pgrx(Pgrx::new(dir, sudo))),
+            _ => Err(BuildError::UnknownPipeline(pipe.to_string())),
+        }
+    }
+
+    /// Attempts to detect and return the appropriate build pipeline to build
+    /// the contents of `dir`. Returns an error if no pipeline can do so.
+    fn detect(dir: PathBuf, sudo: bool) -> Result<Build, BuildError> {
+        // Start with PGXS.
+        let mut score = Pgxs::confidence(&dir);
+        let mut pipe = dist::Pipeline::Pgxs;
+
+        // Does pgrx have a higher score?
+        let c = Pgrx::confidence(&dir);
+        if c > score {
+            score = c;
+            pipe = dist::Pipeline::Pgrx;
+        }
+
+        // Try each of the others as they're added.
+        // Return an error if no confidence.
+        if score == 0 {
+            return Err(BuildError::NoPipeline());
+        }
+
+        // Construct the winner.
+        match pipe {
+            dist::Pipeline::Pgrx => Ok(Build::Pgrx(Pgrx::new(dir, sudo))),
+            dist::Pipeline::Pgxs => Ok(Build::Pgxs(Pgxs::new(dir, sudo))),
+            _ => unreachable!("unknown pipelines {pipe}"),
+        }
+    }
+}
+
 /// Builder builds PGXN releases.
 #[derive(Debug, PartialEq)]
 pub struct Builder {
@@ -36,20 +76,16 @@ pub struct Builder {
 
 impl Builder {
     /// Creates and returns a new builder using the appropriate pipeline.
-    pub fn new<P: AsRef<Path>>(dir: P, meta: Release) -> Result<Self, BuildError> {
+    pub fn new<P: AsRef<Path>>(dir: P, meta: Release, sudo: bool) -> Result<Self, BuildError> {
+        let dir = dir.as_ref().to_path_buf();
         let pipeline = if let Some(deps) = meta.dependencies() {
             if let Some(pipe) = deps.pipeline() {
-                let dir = dir.as_ref().to_path_buf();
-                match pipe {
-                    dist::Pipeline::Pgxs => Build::Pgxs(Pgxs::new(dir, true)),
-                    dist::Pipeline::Pgrx => Build::Pgrx(Pgrx::new(dir, true)),
-                    _ => return Err(BuildError::UnknownPipeline(pipe.to_string())),
-                }
+                Build::new(pipe, dir, sudo)?
             } else {
-                todo!("Detect pipeline");
+                Build::detect(dir, sudo)?
             }
         } else {
-            todo!("Detect pipeline");
+            Build::detect(dir, sudo)?
         };
 
         Ok(Builder { pipeline, meta })
@@ -77,6 +113,14 @@ impl Builder {
         match &self.pipeline {
             Build::Pgxs(pgxs) => pgxs.test(),
             Build::Pgrx(pgrx) => pgrx.test(),
+        }
+    }
+
+    /// Installs a distribution on a particular platform and Postgres version.
+    pub fn install(&self) -> Result<(), BuildError> {
+        match &self.pipeline {
+            Build::Pgxs(pgxs) => pgxs.install(),
+            Build::Pgrx(pgrx) => pgrx.install(),
         }
     }
 }

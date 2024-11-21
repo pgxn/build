@@ -1,5 +1,7 @@
 use super::*;
 use serde_json::{json, Value};
+use std::{fs::File, io::Write};
+use tempfile::tempdir;
 
 fn release_meta(pipeline: &str) -> Value {
     json!({
@@ -18,7 +20,10 @@ fn release_meta(pipeline: &str) -> Value {
           }
         }
       },
-      "dependencies": { "pipeline": pipeline },
+      "dependencies": {
+        "pipeline": pipeline,
+        "postgres": { "version": "14.0" }
+      },
       "meta-spec": { "version": "2.0.0" },
       "certs": {
         "pgxn": {
@@ -35,7 +40,7 @@ fn pgxs() {
     let meta = release_meta("pgxs");
     let dir = Path::new("dir");
     let rel = Release::try_from(meta.clone()).unwrap();
-    let builder = Builder::new(dir, rel).unwrap();
+    let builder = Builder::new(dir, rel, true).unwrap();
     let rel = Release::try_from(meta).unwrap();
     let exp = Builder {
         pipeline: Build::Pgxs(Pgxs::new(dir.to_path_buf(), true)),
@@ -45,6 +50,7 @@ fn pgxs() {
     assert!(builder.configure().is_ok());
     assert!(builder.compile().is_ok());
     assert!(builder.test().is_ok());
+    assert!(builder.install().is_ok());
 }
 
 #[test]
@@ -53,16 +59,17 @@ fn pgrx() {
     let meta = release_meta("pgrx");
     let dir = Path::new("dir");
     let rel = Release::try_from(meta.clone()).unwrap();
-    let builder = Builder::new(dir, rel).unwrap();
+    let builder = Builder::new(dir, rel, false).unwrap();
     let rel = Release::try_from(meta).unwrap();
     let exp = Builder {
-        pipeline: Build::Pgrx(Pgrx::new(dir.to_path_buf(), true)),
+        pipeline: Build::Pgrx(Pgrx::new(dir.to_path_buf(), false)),
         meta: rel,
     };
     assert_eq!(exp, builder, "pgrx");
     assert!(builder.configure().is_ok());
     assert!(builder.compile().is_ok());
     assert!(builder.test().is_ok());
+    assert!(builder.install().is_ok());
 }
 
 #[test]
@@ -72,35 +79,102 @@ fn unsupported_pipeline() {
     let rel = Release::try_from(meta).unwrap();
     assert_eq!(
         BuildError::UnknownPipeline("meson".to_string()).to_string(),
-        Builder::new("dir", rel).unwrap_err().to_string(),
+        Builder::new("dir", rel, true).unwrap_err().to_string(),
     );
 }
 
 #[test]
-#[should_panic(expected = "Detect pipeline")]
-fn detect_pipeline() {
-    // Test unspecified pipeline.
-    let mut meta = release_meta("");
-    meta.as_object_mut().unwrap().remove("dependencies");
-    let rel = Release::try_from(meta).unwrap();
-    _ = Builder::new("dir", rel);
-}
-
-#[test]
-#[should_panic(expected = "Detect pipeline")]
-fn no_pipeline() {
-    // Test unspecified pipeline.
-    let mut meta = release_meta("");
-    let deps = meta
+fn detect_pipeline() -> Result<(), BuildError> {
+    let mut metas = [release_meta(""), release_meta("")];
+    // Remove pipeline specification from the first item.
+    metas[0]
         .as_object_mut()
         .unwrap()
         .get_mut("dependencies")
         .unwrap()
         .as_object_mut()
-        .unwrap();
+        .unwrap()
+        .remove("pipeline");
 
-    deps.remove("pipeline");
-    deps.insert("postgres".to_string(), json!({"version": "14"}));
-    let rel = Release::try_from(meta).unwrap();
-    _ = Builder::new("dir", rel);
+    // Remove dependencies from the second item.
+    metas[1].as_object_mut().unwrap().remove("dependencies");
+
+    fn no_pipe(m: &Value) -> Release {
+        Release::try_from(m.clone()).unwrap()
+    }
+
+    // With empty directory should find no pipeline.
+    let tmp = tempdir()?;
+    let dir = tmp.as_ref();
+    match Build::detect(dir.to_path_buf(), true) {
+        Ok(_) => panic!("detect unexpectedly succeeded with empty dir"),
+        Err(e) => assert_eq!(
+            "cannot detect build pipeline and none specified",
+            e.to_string()
+        ),
+    }
+    for meta in &metas {
+        match Builder::new(dir, no_pipe(meta), true) {
+            Ok(_) => panic!("detect unexpectedly succeeded with empty dir"),
+            Err(e) => assert_eq!(
+                "cannot detect build pipeline and none specified",
+                e.to_string()
+            ),
+        }
+    }
+
+    // Add an empty Makefile, PGXS should win.
+    let mut makefile = File::create(dir.join("Makefile"))?;
+    match Build::detect(dir.to_path_buf(), true) {
+        Ok(p) => assert_eq!(Build::Pgxs(Pgxs::new(dir.to_path_buf(), true)), p),
+        Err(e) => panic!("Unexpectedly errored with Makefile: {e}"),
+    }
+    for meta in &metas {
+        match Builder::new(dir, no_pipe(meta), true) {
+            Ok(b) => assert_eq!(Build::Pgxs(Pgxs::new(dir.to_path_buf(), true)), b.pipeline),
+            Err(e) => panic!("Unexpectedly errored with Makefile: {e}"),
+        }
+    }
+    // Add an empty cargo.toml, PGXS should still win.
+    let mut cargo_toml = File::create(dir.join("Cargo.toml"))?;
+    match Build::detect(dir.to_path_buf(), false) {
+        Ok(p) => assert_eq!(Build::Pgxs(Pgxs::new(dir.to_path_buf(), false)), p),
+        Err(e) => panic!("Unexpectedly errored with Cargo.toml: {e}"),
+    }
+    for meta in &metas {
+        match Builder::new(dir, no_pipe(meta), true) {
+            Ok(b) => assert_eq!(Build::Pgxs(Pgxs::new(dir.to_path_buf(), true)), b.pipeline),
+            Err(e) => panic!("Unexpectedly errored with Cargo.toml: {e}"),
+        }
+    }
+
+    // Add pgrx to Cargo.toml; now pgrx should win.
+    writeln!(&cargo_toml, "[dependencies]\npgrx = \"0.12.6\"")?;
+    cargo_toml.flush()?;
+    match Build::detect(dir.to_path_buf(), true) {
+        Ok(p) => assert_eq!(Build::Pgrx(Pgrx::new(dir.to_path_buf(), true)), p),
+        Err(e) => panic!("Unexpectedly errored with pgrx dependency: {e}"),
+    }
+    for meta in &metas {
+        match Builder::new(dir, no_pipe(meta), false) {
+            Ok(b) => assert_eq!(Build::Pgrx(Pgrx::new(dir.to_path_buf(), false)), b.pipeline),
+            Err(e) => panic!("Unexpectedly errored with pgrx dependency: {e}"),
+        }
+    }
+
+    // Add PG_CONFIG to the Makefile, PGXS should win again.
+    writeln!(&makefile, "PG_CONFIG ?= pg_config")?;
+    makefile.flush()?;
+    match Build::detect(dir.to_path_buf(), false) {
+        Ok(p) => assert_eq!(Build::Pgxs(Pgxs::new(dir.to_path_buf(), false)), p),
+        Err(e) => panic!("Unexpectedly errored with PG_CONFIG var: {e}"),
+    }
+    for meta in &metas {
+        match Builder::new(dir, no_pipe(meta), false) {
+            Ok(b) => assert_eq!(Build::Pgxs(Pgxs::new(dir.to_path_buf(), false)), b.pipeline),
+            Err(e) => panic!("Unexpectedly errored with PG_CONFIG var: {e}"),
+        }
+    }
+
+    Ok(())
 }

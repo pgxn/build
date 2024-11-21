@@ -15,11 +15,13 @@ exclude = [ ".github", ".vscode", ".gitignore", ".ci", ".pre-*.yaml"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+cargo_toml = "0.20.5"
 chrono = "0.4.38"
 hex = "0.4.3"
 iri-string = "0.7.7"
 log = { version = "0.4.22", features = ["kv"] }
 pgxn_meta = "0.5.1"
+regex = "1.11.1"
 semver = "1.0.23"
 serde = "1.0.215"
 serde_json = "1.0.133"

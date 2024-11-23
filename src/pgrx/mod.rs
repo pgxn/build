@@ -4,31 +4,33 @@
 
 use crate::error::BuildError;
 use crate::pipeline::Pipeline;
-use std::path::{Path, PathBuf};
-
-#[cfg(test)]
-mod tests;
+use std::path::Path;
 
 /// Builder implementation for [pgrx] Pipelines.
 ///
 /// [pgrx]: https://github.com/pgcentralfoundation/pgrx
 #[derive(Debug, PartialEq)]
-pub(crate) struct Pgrx {
-    dir: PathBuf,
+pub(crate) struct Pgrx<P: AsRef<Path>> {
     sudo: bool,
+    dir: P,
 }
 
-impl Pipeline for Pgrx {
-    fn new(dir: PathBuf, sudo: bool) -> Self {
-        Pgrx { dir, sudo }
+impl<P: AsRef<Path>> Pipeline<P> for Pgrx<P> {
+    fn new(dir: P, sudo: bool) -> Self {
+        Pgrx { sudo, dir }
+    }
+
+    /// Returns the directory passed to [`Self::new`].
+    fn dir(&self) -> &P {
+        &self.dir
     }
 
     /// Determines the confidence that the Pgrx pipeline can build the
     /// contents of `dir`. Returns 255 if it contains a file named
     /// `Cargo.toml` and lists pgrx as a dependency. Otherwise returns 1 if
     /// `Cargo.toml` exists and 0 if it does not.
-    fn confidence(dir: &Path) -> u8 {
-        let file = dir.join("Cargo.toml");
+    fn confidence(dir: P) -> u8 {
+        let file = dir.as_ref().join("Cargo.toml");
         if !file.exists() {
             return 0;
         }
@@ -65,3 +67,6 @@ impl Pipeline for Pgrx {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

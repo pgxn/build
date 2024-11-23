@@ -4,28 +4,26 @@
 
 use crate::error::BuildError;
 use crate::pipeline::Pipeline;
+use log::info;
 use regex::Regex;
 use std::{
-    fs::File,
+    fs::{self, File},
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
 };
-
-#[cfg(test)]
-mod tests;
 
 /// Builder implementation for [PGXS] Pipelines.
 ///
 /// [PGXS]: https://www.postgresql.org/docs/current/extend-pgxs.html
 #[derive(Debug, PartialEq)]
-pub(crate) struct Pgxs {
-    dir: PathBuf,
+pub(crate) struct Pgxs<P: AsRef<Path>> {
     sudo: bool,
+    dir: P,
 }
 
-impl Pipeline for Pgxs {
-    fn new(dir: PathBuf, sudo: bool) -> Self {
-        Pgxs { dir, sudo }
+impl<P: AsRef<Path>> Pipeline<P> for Pgxs<P> {
+    fn new(dir: P, sudo: bool) -> Self {
+        Pgxs { sudo, dir }
     }
 
     /// Determines the confidence that the Pgxs pipeline can build the
@@ -36,8 +34,8 @@ impl Pipeline for Pgxs {
     /// *   Returns 200 if it declares variables named `MODULES`,
     ///     `MODULE_big`, `PROGRAM`, `EXTENSION`, `DATA`, or `DATA_built`
     /// *   Otherwise returns 127
-    fn confidence(dir: &Path) -> u8 {
-        let file = match makefile(dir) {
+    fn confidence(dir: P) -> u8 {
+        let file = match makefile(dir.as_ref()) {
             Some(f) => f,
             None => return 0,
         };
@@ -67,23 +65,46 @@ impl Pipeline for Pgxs {
         score
     }
 
+    /// Returns the directory passed to [`Self::new`].
+    fn dir(&self) -> &P {
+        &self.dir
+    }
+
     fn configure(&self) -> Result<(), BuildError> {
+        // Run configure if it exists.
+        if let Ok(ok) = fs::exists(self.dir().as_ref().join("configure")) {
+            if ok {
+                info!("running configure");
+                // "." will not work on VMS or MacOS Classic.
+                let cmd = Path::new(".").join("configure").display().to_string();
+                return self.run(&cmd, [""; 0], false);
+            }
+        }
+
         Ok(())
     }
 
     fn compile(&self) -> Result<(), BuildError> {
+        info!("building extension");
+        self.run("make", ["all"], self.sudo)?;
         Ok(())
     }
 
     fn test(&self) -> Result<(), BuildError> {
+        info!("testing extension");
+        self.run("make", ["installcheck"], self.sudo)?;
         Ok(())
     }
 
     fn install(&self) -> Result<(), BuildError> {
+        info!("installing extension");
+        self.run("make", ["install"], self.sudo)?;
         Ok(())
     }
 }
 
+/// Returns the path to a Makefile in `dir`, or [`None`] if no Makefile
+/// exists.
 fn makefile(dir: &Path) -> Option<PathBuf> {
     for makefile in ["GNUmakefile", "makefile", "Makefile"] {
         let file = dir.join(makefile);
@@ -93,3 +114,6 @@ fn makefile(dir: &Path) -> Option<PathBuf> {
     }
     None
 }
+
+#[cfg(test)]
+mod tests;

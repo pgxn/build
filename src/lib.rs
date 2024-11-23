@@ -15,22 +15,22 @@ mod pipeline;
 
 use crate::{error::BuildError, pgrx::Pgrx, pgxs::Pgxs, pipeline::Pipeline};
 use pgxn_meta::{dist, release::Release};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Defines the types of builders.
 #[derive(Debug, PartialEq)]
-enum Build {
+enum Build<P: AsRef<Path>> {
     /// Defines a builder using the PGXS pipeline.
-    Pgxs(Pgxs),
+    Pgxs(Pgxs<P>),
 
     /// Defines a builder using the pgrx pipeline.
-    Pgrx(Pgrx),
+    Pgrx(Pgrx<P>),
 }
 
-impl Build {
+impl<P: AsRef<Path>> Build<P> {
     /// Returns a build pipeline identified by `pipe`, or an error if `pipe`
     /// is unknown.
-    fn new(pipe: &dist::Pipeline, dir: PathBuf, sudo: bool) -> Result<Build, BuildError> {
+    fn new(pipe: &dist::Pipeline, dir: P, sudo: bool) -> Result<Build<P>, BuildError> {
         match pipe {
             dist::Pipeline::Pgxs => Ok(Build::Pgxs(Pgxs::new(dir, sudo))),
             dist::Pipeline::Pgrx => Ok(Build::Pgrx(Pgrx::new(dir, sudo))),
@@ -40,7 +40,7 @@ impl Build {
 
     /// Attempts to detect and return the appropriate build pipeline to build
     /// the contents of `dir`. Returns an error if no pipeline can do so.
-    fn detect(dir: PathBuf, sudo: bool) -> Result<Build, BuildError> {
+    fn detect(dir: P, sudo: bool) -> Result<Build<P>, BuildError> {
         // Start with PGXS.
         let mut score = Pgxs::confidence(&dir);
         let mut pipe = dist::Pipeline::Pgxs;
@@ -69,15 +69,14 @@ impl Build {
 
 /// Builder builds PGXN releases.
 #[derive(Debug, PartialEq)]
-pub struct Builder {
-    pipeline: Build,
+pub struct Builder<P: AsRef<Path>> {
+    pipeline: Build<P>,
     meta: Release,
 }
 
-impl Builder {
+impl<P: AsRef<Path>> Builder<P> {
     /// Creates and returns a new builder using the appropriate pipeline.
-    pub fn new<P: AsRef<Path>>(dir: P, meta: Release, sudo: bool) -> Result<Self, BuildError> {
-        let dir = dir.as_ref().to_path_buf();
+    pub fn new(dir: P, meta: Release, sudo: bool) -> Result<Self, BuildError> {
         let pipeline = if let Some(deps) = meta.dependencies() {
             if let Some(pipe) = deps.pipeline() {
                 Build::new(pipe, dir, sudo)?

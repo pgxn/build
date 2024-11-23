@@ -1,4 +1,7 @@
 use super::*;
+use assertables::*;
+#[cfg(target_family = "unix")]
+use std::os::unix::fs::PermissionsExt;
 use std::{
     fs::{self, File},
     io::Write,
@@ -52,22 +55,95 @@ fn confidence() -> Result<(), BuildError> {
 #[test]
 fn new() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let pipe = Pgxs::new(dir.to_path_buf(), false);
+    let pipe = Pgxs::new(dir, false);
     assert_eq!(dir, pipe.dir);
+    assert_eq!(&dir, pipe.dir());
     assert!(!pipe.sudo);
 
     let dir2 = dir.join("corpus");
-    let pipe = Pgxs::new(dir2.to_path_buf(), true);
+    let pipe = Pgxs::new(dir2.as_path(), true);
     assert_eq!(dir2, pipe.dir);
+    assert_eq!(&dir2, pipe.dir());
     assert!(pipe.sudo);
 }
 
 #[test]
-fn configure_et_al() {
+fn configure() -> Result<(), BuildError> {
+    let tmp = tempdir()?;
+    let pipe = Pgxs::new(&tmp, false);
+
+    // Try with no Configure file.
+    if let Err(e) = pipe.configure() {
+        panic!("configure with no file: {e}");
+    }
+
+    // Now try with a configure file.
+    let path = tmp.path().join("configure");
+    #[cfg(target_family = "windows")]
+    {
+        let cfg = File::create(&path)?;
+        writeln!(&cfg, "@echo off\r\necho configuring something...\r\n")?;
+    }
+    #[cfg(not(target_family = "windows"))]
+    {
+        let cfg = File::create(&path)?;
+        writeln!(&cfg, "#! /bin/sh\n\necho configuring something...\n")?;
+    }
+    match pipe.configure() {
+        Ok(_) => panic!("configure unexpectedly succeeded"),
+        Err(e) => {
+            assert_starts_with!(e.to_string(), "executing ");
+            assert_ends_with!(
+                e.to_string(),
+                if cfg!(windows) {
+                    "`\".\\\\configure\"`: entity not found"
+                } else {
+                    "\"./configure\"`: permission denied"
+                },
+            )
+        }
+    }
+
+    // Make it executable.
+    #[cfg(target_family = "windows")]
+    {
+        // Turn it into a batch file.
+        std::fs::rename(path, tmp.path().join("configure.bat"))?;
+    }
+    #[cfg(not(target_family = "windows"))]
+    {
+        // Make it executable.
+        let mut perms = fs::metadata(&path)?.permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&path, perms)?;
+    }
+    if let Err(e) = pipe.configure() {
+        panic!("Configure failed: {e}");
+    }
+
+    Ok(())
+}
+
+#[test]
+fn compile() -> Result<(), BuildError> {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let pipe = Pgxs::new(dir.to_path_buf(), false);
-    assert!(pipe.configure().is_ok());
+    let pipe = Pgxs::new(dir, false);
     assert!(pipe.compile().is_ok());
+    Ok(())
+}
+
+#[test]
+fn test() -> Result<(), BuildError> {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let pipe = Pgxs::new(dir, false);
     assert!(pipe.test().is_ok());
+    Ok(())
+}
+
+#[test]
+fn install() -> Result<(), BuildError> {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let pipe = Pgxs::new(dir, false);
     assert!(pipe.install().is_ok());
+    Ok(())
 }

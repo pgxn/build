@@ -9,9 +9,6 @@ use std::{borrow::Borrow, io};
 
 use crate::error::BuildError;
 
-#[cfg(test)]
-mod tests;
-
 /// Represents a single distribution release in [`Releases`].
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct Release {
@@ -127,3 +124,6 @@ fn latest_version(releases: Option<&[Release]>) -> Option<&Version> {
         Some(list) => Some(list[0].version()),
     }
 }
+
+#[cfg(test)]
+mod tests;

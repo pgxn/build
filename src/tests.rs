@@ -38,12 +38,12 @@ fn release_meta(pipeline: &str) -> Value {
 fn pgxs() {
     // Test pgxs pipeline.
     let meta = release_meta("pgxs");
-    let dir = Path::new("dir");
+    let tmp = tempdir().unwrap();
     let rel = Release::try_from(meta.clone()).unwrap();
-    let builder = Builder::new(dir, rel, true).unwrap();
+    let builder = Builder::new(tmp.as_ref(), rel, false).unwrap();
     let rel = Release::try_from(meta).unwrap();
     let exp = Builder {
-        pipeline: Build::Pgxs(Pgxs::new(dir.to_path_buf(), true)),
+        pipeline: Build::Pgxs(Pgxs::new(tmp.as_ref(), false)),
         meta: rel,
     };
     assert_eq!(exp, builder, "pgxs");
@@ -57,12 +57,12 @@ fn pgxs() {
 fn pgrx() {
     // Test pgrx pipeline.
     let meta = release_meta("pgrx");
-    let dir = Path::new("dir");
+    let tmp = tempdir().unwrap();
     let rel = Release::try_from(meta.clone()).unwrap();
-    let builder = Builder::new(dir, rel, false).unwrap();
+    let builder = Builder::new(tmp.as_ref(), rel, false).unwrap();
     let rel = Release::try_from(meta).unwrap();
     let exp = Builder {
-        pipeline: Build::Pgrx(Pgrx::new(dir.to_path_buf(), false)),
+        pipeline: Build::Pgrx(Pgrx::new(tmp.as_ref(), false)),
         meta: rel,
     };
     assert_eq!(exp, builder, "pgrx");
@@ -106,7 +106,7 @@ fn detect_pipeline() -> Result<(), BuildError> {
     // With empty directory should find no pipeline.
     let tmp = tempdir()?;
     let dir = tmp.as_ref();
-    match Build::detect(dir.to_path_buf(), true) {
+    match Build::detect(dir, true) {
         Ok(_) => panic!("detect unexpectedly succeeded with empty dir"),
         Err(e) => assert_eq!(
             "cannot detect build pipeline and none specified",
@@ -125,25 +125,25 @@ fn detect_pipeline() -> Result<(), BuildError> {
 
     // Add an empty Makefile, PGXS should win.
     let mut makefile = File::create(dir.join("Makefile"))?;
-    match Build::detect(dir.to_path_buf(), true) {
-        Ok(p) => assert_eq!(Build::Pgxs(Pgxs::new(dir.to_path_buf(), true)), p),
+    match Build::detect(dir, true) {
+        Ok(p) => assert_eq!(Build::Pgxs(Pgxs::new(dir, true)), p),
         Err(e) => panic!("Unexpectedly errored with Makefile: {e}"),
     }
     for meta in &metas {
         match Builder::new(dir, no_pipe(meta), true) {
-            Ok(b) => assert_eq!(Build::Pgxs(Pgxs::new(dir.to_path_buf(), true)), b.pipeline),
+            Ok(b) => assert_eq!(Build::Pgxs(Pgxs::new(dir, true)), b.pipeline),
             Err(e) => panic!("Unexpectedly errored with Makefile: {e}"),
         }
     }
     // Add an empty cargo.toml, PGXS should still win.
     let mut cargo_toml = File::create(dir.join("Cargo.toml"))?;
-    match Build::detect(dir.to_path_buf(), false) {
-        Ok(p) => assert_eq!(Build::Pgxs(Pgxs::new(dir.to_path_buf(), false)), p),
+    match Build::detect(dir, false) {
+        Ok(p) => assert_eq!(Build::Pgxs(Pgxs::new(dir, false)), p),
         Err(e) => panic!("Unexpectedly errored with Cargo.toml: {e}"),
     }
     for meta in &metas {
         match Builder::new(dir, no_pipe(meta), true) {
-            Ok(b) => assert_eq!(Build::Pgxs(Pgxs::new(dir.to_path_buf(), true)), b.pipeline),
+            Ok(b) => assert_eq!(Build::Pgxs(Pgxs::new(dir, true)), b.pipeline),
             Err(e) => panic!("Unexpectedly errored with Cargo.toml: {e}"),
         }
     }
@@ -151,13 +151,13 @@ fn detect_pipeline() -> Result<(), BuildError> {
     // Add pgrx to Cargo.toml; now pgrx should win.
     writeln!(&cargo_toml, "[dependencies]\npgrx = \"0.12.6\"")?;
     cargo_toml.flush()?;
-    match Build::detect(dir.to_path_buf(), true) {
-        Ok(p) => assert_eq!(Build::Pgrx(Pgrx::new(dir.to_path_buf(), true)), p),
+    match Build::detect(dir, true) {
+        Ok(p) => assert_eq!(Build::Pgrx(Pgrx::new(dir, true)), p),
         Err(e) => panic!("Unexpectedly errored with pgrx dependency: {e}"),
     }
     for meta in &metas {
         match Builder::new(dir, no_pipe(meta), false) {
-            Ok(b) => assert_eq!(Build::Pgrx(Pgrx::new(dir.to_path_buf(), false)), b.pipeline),
+            Ok(b) => assert_eq!(Build::Pgrx(Pgrx::new(dir, false)), b.pipeline),
             Err(e) => panic!("Unexpectedly errored with pgrx dependency: {e}"),
         }
     }
@@ -165,13 +165,13 @@ fn detect_pipeline() -> Result<(), BuildError> {
     // Add PG_CONFIG to the Makefile, PGXS should win again.
     writeln!(&makefile, "PG_CONFIG ?= pg_config")?;
     makefile.flush()?;
-    match Build::detect(dir.to_path_buf(), false) {
-        Ok(p) => assert_eq!(Build::Pgxs(Pgxs::new(dir.to_path_buf(), false)), p),
+    match Build::detect(dir, false) {
+        Ok(p) => assert_eq!(Build::Pgxs(Pgxs::new(dir, false)), p),
         Err(e) => panic!("Unexpectedly errored with PG_CONFIG var: {e}"),
     }
     for meta in &metas {
         match Builder::new(dir, no_pipe(meta), false) {
-            Ok(b) => assert_eq!(Build::Pgxs(Pgxs::new(dir.to_path_buf(), false)), b.pipeline),
+            Ok(b) => assert_eq!(Build::Pgxs(Pgxs::new(dir, false)), b.pipeline),
             Err(e) => panic!("Unexpectedly errored with PG_CONFIG var: {e}"),
         }
     }

@@ -159,6 +159,14 @@ fn versions() -> Result<(), BuildError> {
                 testing: None,
             },
         ),
+        (
+            "no release data",
+            Releases {
+                stable: None,
+                unstable: None,
+                testing: None,
+            },
+        ),
     ] {
         let dist = Dist {
             name: name.to_string(),
@@ -194,6 +202,17 @@ fn versions() -> Result<(), BuildError> {
             None => {
                 assert!(dist.latest_unstable_version().is_none())
             }
+        }
+
+        // Check for error when no release data.
+        if dist.releases.unstable.is_none()
+            && dist.releases.stable.is_none()
+            && dist.releases.testing.is_none()
+        {
+            assert_eq!(
+                "missing release data",
+                dist.best_version().unwrap_err().to_string()
+            );
         }
     }
 

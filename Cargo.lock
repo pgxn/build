@@ -100,6 +100,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "assertables"
+version = "9.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "005f97d2f6ec6956e08b103a6a74dd89da602edcbe3a59379992176fe47e32e5"
+
+[[package]]
 name = "async-attributes"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1566,6 +1572,7 @@ dependencies = [
 name = "pgxn_build"
 version = "0.1.0"
 dependencies = [
+ "assertables",
  "cargo_toml",
  "chrono",
  "hex",
@@ -1578,6 +1585,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "temp-env",
  "tempfile",
  "thiserror 2.0.3",
  "ureq",
@@ -2151,6 +2159,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "temp-env"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96374855068f47402c3121c6eed88d29cb1de8f3ab27090e273e420bdabcf050"
+dependencies = [
+ "parking_lot",
+]
+
+[[package]]
 name = "tempfile"
 version = "3.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2430,9 +2447,9 @@ dependencies = [
 
 [[package]]
 name = "url"
-version = "2.5.3"
+version = "2.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d157f1b96d14500ffdc1f10ba712e780825526c03d9a49b4d0324b0d9113ada"
+checksum = "32f8b686cadd1473f4bd0117a5d28d36b1ade384ea9b5069a1c40aefed7fda60"
 dependencies = [
  "form_urlencoded",
  "idna 1.0.3",

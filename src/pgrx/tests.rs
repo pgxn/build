@@ -27,20 +27,22 @@ fn confidence() -> Result<(), BuildError> {
 #[test]
 fn new() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let pipe = Pgrx::new(dir.to_path_buf(), false);
+    let pipe = Pgrx::new(dir, false);
     assert_eq!(dir, pipe.dir);
+    assert_eq!(&dir, pipe.dir());
     assert!(!pipe.sudo);
 
     let dir2 = dir.join("corpus");
-    let pipe = Pgrx::new(dir2.to_path_buf(), true);
+    let pipe = Pgrx::new(dir2.as_path(), true);
     assert_eq!(dir2, pipe.dir);
+    assert_eq!(&dir2, pipe.dir());
     assert!(pipe.sudo);
 }
 
 #[test]
 fn configure_et_al() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let pipe = Pgrx::new(dir.to_path_buf(), false);
+    let pipe = Pgrx::new(dir, false);
     assert!(pipe.configure().is_ok());
     assert!(pipe.compile().is_ok());
     assert!(pipe.test().is_ok());

@@ -68,6 +68,14 @@ pub enum BuildError {
     /// Zip archive error.
     #[error("{0}")]
     Archive(#[from] zip::result::ZipError),
+
+    /// Missing file.
+    #[error("missing {0}")]
+    MissingFile(&'static str),
+
+    /// Command execution failure.
+    #[error("executing `{0:?}`: {1}")]
+    Command(std::process::Command, io::ErrorKind),
 }
 
 impl From<ureq::Error> for BuildError {

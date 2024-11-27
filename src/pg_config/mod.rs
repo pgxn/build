@@ -21,7 +21,7 @@ impl PgConfig {
         if !out.status.success() {
             return Err(BuildError::Command(
                 format!("{:?}", cmd),
-                String::from_utf8_lossy(&out.stdout).to_string(),
+                String::from_utf8_lossy(&out.stderr).to_string(),
             ));
         }
 

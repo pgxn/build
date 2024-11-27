@@ -1,6 +1,6 @@
 use super::*;
 use serde_json::{json, Value};
-use std::{fs::File, io::Write};
+use std::{fs::File, io::Write, process::Command};
 use tempfile::tempdir;
 
 fn release_meta(pipeline: &str) -> Value {
@@ -48,9 +48,10 @@ fn pgxs() {
     };
     assert_eq!(exp, builder, "pgxs");
     assert!(builder.configure().is_ok());
-    assert!(builder.compile().is_ok());
-    assert!(builder.test().is_ok());
-    assert!(builder.install().is_ok());
+    assert!(builder.compile().is_err());
+    assert!(builder.test().is_err());
+    assert!(builder.test().is_err());
+    assert!(builder.install().is_err());
 }
 
 #[test]
@@ -177,4 +178,24 @@ fn detect_pipeline() -> Result<(), BuildError> {
     }
 
     Ok(())
+}
+
+/// Utility function for compiling `mocks/{name}.rs` into `dest`. Used to
+/// provide consistent execution and output for testing across OSes.
+pub fn compile_mock(name: &str, dest: &str) {
+    let src = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("mocks")
+        .join(format!("{name}.rs"))
+        .display()
+        .to_string();
+    let out = Command::new("rustc")
+        .args([&src, "-o", dest])
+        .output()
+        .unwrap();
+    if !out.status.success() {
+        panic!(
+            "Failed to build {name}.rs: {}",
+            String::from_utf8_lossy(&out.stderr),
+        )
+    }
 }

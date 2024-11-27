@@ -79,14 +79,11 @@ fn configure() -> Result<(), BuildError> {
 
     // Now try with a configure file.
     let path = tmp.path().join("configure");
-    #[cfg(target_family = "windows")]
     {
         let cfg = File::create(&path)?;
+        #[cfg(target_family = "windows")]
         writeln!(&cfg, "@echo off\r\necho configuring something...\r\n")?;
-    }
-    #[cfg(not(target_family = "windows"))]
-    {
-        let cfg = File::create(&path)?;
+        #[cfg(not(target_family = "windows"))]
         writeln!(&cfg, "#! /bin/sh\n\necho configuring something...\n")?;
     }
     match pipe.configure() {
@@ -106,10 +103,8 @@ fn configure() -> Result<(), BuildError> {
 
     // Make it executable.
     #[cfg(target_family = "windows")]
-    {
-        // Turn it into a batch file.
-        std::fs::rename(path, tmp.path().join("configure.bat"))?;
-    }
+    // Turn it into a batch file.
+    std::fs::rename(path, tmp.path().join("configure.bat"))?;
     #[cfg(not(target_family = "windows"))]
     {
         // Make it executable.
@@ -128,7 +123,7 @@ fn configure() -> Result<(), BuildError> {
 fn compile() -> Result<(), BuildError> {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let pipe = Pgxs::new(dir, false);
-    assert!(pipe.compile().is_ok());
+    assert!(pipe.compile().is_err());
     Ok(())
 }
 
@@ -136,7 +131,7 @@ fn compile() -> Result<(), BuildError> {
 fn test() -> Result<(), BuildError> {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let pipe = Pgxs::new(dir, false);
-    assert!(pipe.test().is_ok());
+    assert!(pipe.test().is_err());
     Ok(())
 }
 
@@ -144,6 +139,6 @@ fn test() -> Result<(), BuildError> {
 fn install() -> Result<(), BuildError> {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let pipe = Pgxs::new(dir, false);
-    assert!(pipe.install().is_ok());
+    assert!(pipe.install().is_err());
     Ok(())
 }

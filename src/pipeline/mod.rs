@@ -37,15 +37,8 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
         I: IntoIterator<Item = S>,
         S: AsRef<std::ffi::OsStr>,
     {
-        // Ignore the `sudo` param on Windows, since it is not currently
-        // possible to mock it on Windows (see notes in tests.rs), and though
-        // it [exists](https://github.com/microsoft/sudo), it's not clear
-        // whether it's the right thing to require, or if elevated privileges
-        // will be required at all in Windows. Revisit once all the
-        // dependencies for building extensions on Windows are recognized and
-        // put to use to formally support building and installing extensions
-        // on Windows.
-        let mut cmd = if cfg!(not(windows)) && sudo {
+        // Use `sudo` if the param is set.
+        let mut cmd = if sudo {
             let mut c = Command::new("sudo");
             c.arg(cmd);
             c
@@ -56,7 +49,15 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
         cmd.args(args);
         cmd.current_dir(self.dir());
         match cmd.output() {
-            Ok(_) => Ok(()),
+            Ok(out) => {
+                if !out.status.success() {
+                    return Err(BuildError::Command(
+                        format!("{:?}", cmd),
+                        String::from_utf8_lossy(&out.stderr).to_string(),
+                    ));
+                }
+                Ok(())
+            }
             Err(e) => Err(BuildError::Command(
                 format!("{:?}", cmd),
                 e.kind().to_string(),

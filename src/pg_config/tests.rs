@@ -1,4 +1,5 @@
 use super::*;
+use crate::tests::compile_mock;
 use assertables::*;
 use tempfile::tempdir;
 
@@ -110,16 +111,4 @@ fn pg_config_err() {
             assert_ends_with!(e.to_string(), "nonesuch\"`: entity not found");
         }
     }
-}
-
-fn compile_mock(name: &str, dest: &str) {
-    let src = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("mocks")
-        .join(format!("{name}.rs"))
-        .display()
-        .to_string();
-    Command::new("rustc")
-        .args([&src, "-o", dest])
-        .output()
-        .unwrap();
 }

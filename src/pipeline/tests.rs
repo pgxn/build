@@ -1,7 +1,7 @@
 use super::*;
-#[cfg(target_family = "unix")]
-use std::os::unix::fs::PermissionsExt;
-use std::{env, fs::File, io::Write};
+use crate::tests::compile_mock;
+use assertables::*;
+use std::env;
 use tempfile::tempdir;
 
 struct TestPipeline<P: AsRef<Path>> {
@@ -39,40 +39,42 @@ impl<P: AsRef<Path>> Pipeline<P> for TestPipeline<P> {
 fn run() -> Result<(), BuildError> {
     let tmp = tempdir()?;
 
+    // Test basic success.
     let pipe = TestPipeline::new(&tmp, false);
     if let Err(e) = pipe.run("echo", ["hello"], false) {
         panic!("echo hello failed: {e}");
     }
 
-    // Mock up sudo command as a simple shell script.
-    #[cfg(target_family = "windows")]
-    {
-        // This should work but does not, even though it's put into the path
-        // below, because Command only supports `.exe` files:
-        //
-        // > Note on Windows: For executable files with the .exe extension, it
-        // > can be omitted when specifying the program for this Command.
-        // > However, if the file has a different extension, a filename
-        // > including the extension needs to be provided, otherwise the file
-        // > won’t be found.
-        //
-        // https://doc.rust-lang.org/std/process/struct.Command.html#platform-specific-behavior
-        //
-        // For now run() ignores the `sudo` param, since it's not clear it's
-        // the right command anyway.
-        let sudo = tmp.path().join("sudo.bat");
-        let file = File::create(&sudo)?;
-        writeln!(&file, "@echo off\r\necho %*\r\n")?;
+    // Test nonexistent file.
+    match pipe.run("__nonesuch_nope__", [""], false) {
+        Ok(_) => panic!("Nonexistent file unexpectedly succeeded"),
+        Err(e) => {
+            assert_starts_with!(e.to_string(), "executing ");
+            assert_ends_with!(
+                e.to_string(),
+                "\"__nonesuch_nope__\" \"\"`: entity not found"
+            )
+        }
     }
-    #[cfg(not(target_family = "windows"))]
-    {
-        let sudo = tmp.path().join("sudo");
-        let file = File::create(&sudo)?;
-        writeln!(&file, "#! /bin/sh\n\necho \"$@\"\n")?;
-        let mut perms = std::fs::metadata(&sudo)?.permissions();
-        perms.set_mode(0o755);
-        std::fs::set_permissions(&sudo, perms)?;
+
+    // Test an executable that returns an error.
+    let path = tmp.path().join("exit_err").display().to_string();
+    compile_mock("exit_err", &path);
+    match pipe.run(&path, ["hi"], false) {
+        Ok(_) => panic!("exit_err unexpectedly succeeded"),
+        Err(e) => {
+            assert_starts_with!(e.to_string(), "executing");
+            assert_ends_with!(e.to_string(), " DED: hi\n");
+        }
     }
+
+    // Build a mock `sudo` that echos output.
+    let dest = tmp
+        .path()
+        .join(if cfg!(windows) { "sudo.exe" } else { "sudo" })
+        .display()
+        .to_string();
+    compile_mock("echo", &dest);
 
     // Create a PATH variable that searches tmp first.
     let path = env::var("PATH").unwrap();

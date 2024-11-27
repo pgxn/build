@@ -74,8 +74,8 @@ pub enum BuildError {
     MissingFile(&'static str),
 
     /// Command execution failure.
-    #[error("executing `{0:?}`: {1}")]
-    Command(std::process::Command, io::ErrorKind),
+    #[error("executing `{0}`: {1}")]
+    Command(String, String),
 }
 
 impl From<ureq::Error> for BuildError {

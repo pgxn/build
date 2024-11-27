@@ -57,7 +57,10 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
         cmd.current_dir(self.dir());
         match cmd.output() {
             Ok(_) => Ok(()),
-            Err(e) => Err(BuildError::Command(cmd, e.kind())),
+            Err(e) => Err(BuildError::Command(
+                format!("{:?}", cmd),
+                e.kind().to_string(),
+            )),
         }
     }
 }

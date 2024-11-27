@@ -9,6 +9,7 @@ versions.
 */
 pub mod api;
 pub mod error;
+mod pg_config;
 mod pgrx;
 mod pgxs;
 mod pipeline;

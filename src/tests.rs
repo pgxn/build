@@ -1,6 +1,6 @@
 use super::*;
 use serde_json::{json, Value};
-use std::{fs::File, io::Write, process::Command};
+use std::{fs::File, io::Write, path::PathBuf, process::Command};
 use tempfile::tempdir;
 
 fn release_meta(pipeline: &str) -> Value {
@@ -198,4 +198,12 @@ pub fn compile_mock(name: &str, dest: &str) {
             String::from_utf8_lossy(&out.stderr),
         )
     }
+}
+
+#[test]
+fn filename() {
+    assert_eq!("string", crate::filename("string"));
+    assert_eq!("path", crate::filename(Path::new("path")));
+    let pb = PathBuf::from(r"C:\windows\system32.dll");
+    assert_eq!(r"C:\windows\system32.dll", crate::filename(&pb));
 }

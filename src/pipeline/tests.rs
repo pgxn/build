@@ -91,3 +91,14 @@ fn run() -> Result<(), BuildError> {
 
     Ok(())
 }
+
+#[test]
+fn is_writeable() -> Result<(), BuildError> {
+    let tmp = tempdir()?;
+
+    let pipe = TestPipeline::new(&tmp, false);
+    assert!(pipe.is_writeable(&tmp));
+    assert!(!pipe.is_writeable(tmp.path().join(" nonesuch")));
+
+    Ok(())
+}

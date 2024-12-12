@@ -21,16 +21,6 @@ use std::{
 };
 use url::Url;
 
-/// Returns a string representation of the final segment of a Path.
-macro_rules! filename {
-    ( $x:expr ) => {{
-        $x.as_ref()
-            .file_name()
-            .unwrap_or(std::ffi::OsStr::new("UNKNOWN"))
-            .to_string_lossy()
-    }};
-}
-
 macro_rules! copy_err {
     ($x:expr, $y:expr, $z:expr) => {{
         Err(BuildError::File(
@@ -128,7 +118,7 @@ impl Api {
     /// Unpack download `file` in directory `into` and return the path to the
     /// unpacked directory.
     pub fn unpack<P: AsRef<Path>>(&self, into: P, file: P) -> Result<PathBuf, BuildError> {
-        info!(file:display = filename!(file); "unpacking");
+        info!(file:display = crate::filename(&file); "unpacking");
         let zip = File::open(file)?;
         let mut archive = zip::ZipArchive::new(zip)?;
         archive.extract(&into)?;

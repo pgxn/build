@@ -125,5 +125,14 @@ impl<P: AsRef<Path>> Builder<P> {
     }
 }
 
+/// Returns a string representation of `path`.
+pub(crate) fn filename<P: AsRef<Path>>(path: P) -> String {
+    path.as_ref()
+        .file_name()
+        .unwrap_or(std::ffi::OsStr::new("UNKNOWN"))
+        .to_string_lossy()
+        .to_string()
+}
+
 #[cfg(test)]
 mod tests;

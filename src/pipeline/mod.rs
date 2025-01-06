@@ -1,7 +1,8 @@
 //! Build Pipeline interface definition.
 
 use crate::error::BuildError;
-use std::{path::Path, process::Command};
+use log::debug;
+use std::{io::Write, path::Path, process::Command};
 
 /// Defines the interface for build pipelines to configure, compile, and test
 /// PGXN distributions.
@@ -29,6 +30,20 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
 
     /// Returns the directory passed to [`new`].
     fn dir(&self) -> &P;
+
+    /// Attempts to write a temporary file to `dir` and returns `true` on
+    /// success and `false` on failure. The temporary file will be deleted.
+    fn is_writeable<D: AsRef<Path>>(&self, dir: D) -> bool {
+        debug!(dir:display = crate::filename(&dir); "testing write access");
+        match tempfile::Builder::new()
+            .prefix("pgxn-")
+            .suffix(".test")
+            .tempfile_in(dir)
+        {
+            Ok(f) => write!(&f, "ok").is_ok(),
+            Err(_) => false,
+        }
+    }
 
     /// Run a command. Runs it with elevated privileges using `sudo` unless
     /// it's on Windows.

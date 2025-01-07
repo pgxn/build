@@ -1,5 +1,5 @@
 use super::*;
-use std::{fs::File, io::Write};
+use std::{collections::HashMap, fs::File, io::Write};
 use tempfile::tempdir;
 
 #[test]
@@ -27,22 +27,26 @@ fn confidence() -> Result<(), BuildError> {
 #[test]
 fn new() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let pipe = Pgrx::new(dir, false);
+    let cfg = PgConfig::from_map(HashMap::new());
+    let pipe = Pgrx::new(dir, cfg.clone(), false);
     assert_eq!(dir, pipe.dir);
     assert_eq!(&dir, pipe.dir());
+    assert_eq!(&cfg, pipe.pg_config());
     assert!(!pipe.sudo);
 
     let dir2 = dir.join("corpus");
-    let pipe = Pgrx::new(dir2.as_path(), true);
+    let cfg2 = PgConfig::from_map(HashMap::from([("bindir".to_string(), "bin".to_string())]));
+    let pipe = Pgrx::new(dir2.as_path(), cfg2.clone(), true);
     assert_eq!(dir2, pipe.dir);
     assert_eq!(&dir2, pipe.dir());
+    assert_eq!(&cfg2, pipe.pg_config());
     assert!(pipe.sudo);
 }
 
 #[test]
 fn configure_et_al() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let pipe = Pgrx::new(dir, false);
+    let pipe = Pgrx::new(dir, PgConfig::from_map(HashMap::new()), false);
     assert!(pipe.configure().is_ok());
     assert!(pipe.compile().is_ok());
     assert!(pipe.test().is_ok());

@@ -7,7 +7,8 @@ use std::{
 
 use crate::error::BuildError;
 
-pub(crate) struct PgConfig(HashMap<String, String>);
+#[derive(Debug, PartialEq, Clone)]
+pub struct PgConfig(HashMap<String, String>);
 
 impl PgConfig {
     /// Executes `pg_config`, parses the output, and returns a `PgConfig`
@@ -38,6 +39,11 @@ impl PgConfig {
         }
 
         Ok(PgConfig(cfg))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn from_map(map: HashMap<String, String>) -> Self {
+        Self(map)
     }
 
     /// Returns the `pg_config` value for `cfg`, which should be a lowercase

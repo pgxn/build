@@ -15,6 +15,7 @@ mod pgxs;
 mod pipeline;
 
 use crate::{error::BuildError, pgrx::Pgrx, pgxs::Pgxs, pipeline::Pipeline};
+use pg_config::PgConfig;
 use pgxn_meta::{dist, release::Release};
 use std::path::Path;
 
@@ -31,17 +32,22 @@ enum Build<P: AsRef<Path>> {
 impl<P: AsRef<Path>> Build<P> {
     /// Returns a build pipeline identified by `pipe`, or an error if `pipe`
     /// is unknown.
-    fn new(pipe: &dist::Pipeline, dir: P, sudo: bool) -> Result<Build<P>, BuildError> {
+    fn new(
+        pipe: &dist::Pipeline,
+        dir: P,
+        cfg: PgConfig,
+        sudo: bool,
+    ) -> Result<Build<P>, BuildError> {
         match pipe {
-            dist::Pipeline::Pgxs => Ok(Build::Pgxs(Pgxs::new(dir, sudo))),
-            dist::Pipeline::Pgrx => Ok(Build::Pgrx(Pgrx::new(dir, sudo))),
+            dist::Pipeline::Pgxs => Ok(Build::Pgxs(Pgxs::new(dir, cfg, sudo))),
+            dist::Pipeline::Pgrx => Ok(Build::Pgrx(Pgrx::new(dir, cfg, sudo))),
             _ => Err(BuildError::UnknownPipeline(pipe.to_string())),
         }
     }
 
     /// Attempts to detect and return the appropriate build pipeline to build
     /// the contents of `dir`. Returns an error if no pipeline can do so.
-    fn detect(dir: P, sudo: bool) -> Result<Build<P>, BuildError> {
+    fn detect(dir: P, cfg: PgConfig, sudo: bool) -> Result<Build<P>, BuildError> {
         // Start with PGXS.
         let mut score = Pgxs::confidence(&dir);
         let mut pipe = dist::Pipeline::Pgxs;
@@ -61,8 +67,8 @@ impl<P: AsRef<Path>> Build<P> {
 
         // Construct the winner.
         match pipe {
-            dist::Pipeline::Pgrx => Ok(Build::Pgrx(Pgrx::new(dir, sudo))),
-            dist::Pipeline::Pgxs => Ok(Build::Pgxs(Pgxs::new(dir, sudo))),
+            dist::Pipeline::Pgrx => Ok(Build::Pgrx(Pgrx::new(dir, cfg, sudo))),
+            dist::Pipeline::Pgxs => Ok(Build::Pgxs(Pgxs::new(dir, cfg, sudo))),
             _ => unreachable!("unknown pipelines {pipe}"),
         }
     }
@@ -77,15 +83,15 @@ pub struct Builder<P: AsRef<Path>> {
 
 impl<P: AsRef<Path>> Builder<P> {
     /// Creates and returns a new builder using the appropriate pipeline.
-    pub fn new(dir: P, meta: Release, sudo: bool) -> Result<Self, BuildError> {
+    pub fn new(dir: P, meta: Release, cfg: PgConfig, sudo: bool) -> Result<Self, BuildError> {
         let pipeline = if let Some(deps) = meta.dependencies() {
             if let Some(pipe) = deps.pipeline() {
-                Build::new(pipe, dir, sudo)?
+                Build::new(pipe, dir, cfg, sudo)?
             } else {
-                Build::detect(dir, sudo)?
+                Build::detect(dir, cfg, sudo)?
             }
         } else {
-            Build::detect(dir, sudo)?
+            Build::detect(dir, cfg, sudo)?
         };
 
         Ok(Builder { pipeline, meta })

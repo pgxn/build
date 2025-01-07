@@ -1,6 +1,6 @@
 //! Build Pipeline interface definition.
 
-use crate::error::BuildError;
+use crate::{error::BuildError, pg_config::PgConfig};
 use log::debug;
 use std::{io::Write, path::Path, process::Command};
 
@@ -8,7 +8,7 @@ use std::{io::Write, path::Path, process::Command};
 /// PGXN distributions.
 pub(crate) trait Pipeline<P: AsRef<Path>> {
     /// Creates an instance of a Pipeline.
-    fn new(dir: P, sudo: bool) -> Self;
+    fn new(dir: P, pg_config: PgConfig, sudo: bool) -> Self;
 
     /// Returns a score for the confidence that this pipeline can build the
     /// contents of `dir`. A score of 0 means no confidence and 255 means the
@@ -30,6 +30,9 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
 
     /// Returns the directory passed to [`new`].
     fn dir(&self) -> &P;
+
+    /// Returns the PgConfig passed to [`new`].
+    fn pg_config(&self) -> &PgConfig;
 
     /// Attempts to write a temporary file to `dir` and returns `true` on
     /// success and `false` on failure. The temporary file will be deleted.

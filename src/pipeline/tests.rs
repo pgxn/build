@@ -1,21 +1,27 @@
 use super::*;
 use crate::tests::compile_mock;
 use assertables::*;
-use std::env;
+use std::{collections::HashMap, env};
 use tempfile::tempdir;
 
 struct TestPipeline<P: AsRef<Path>> {
     dir: P,
+    cfg: PgConfig,
 }
 
 // Create a mock version of the trait.
 #[cfg(test)]
 impl<P: AsRef<Path>> Pipeline<P> for TestPipeline<P> {
-    fn new(dir: P, _: bool) -> Self {
-        TestPipeline { dir }
+    fn new(dir: P, cfg: PgConfig, _: bool) -> Self {
+        TestPipeline { dir, cfg }
     }
+
     fn dir(&self) -> &P {
         &self.dir
+    }
+
+    fn pg_config(&self) -> &PgConfig {
+        &self.cfg
     }
 
     fn confidence(_: P) -> u8 {
@@ -38,9 +44,10 @@ impl<P: AsRef<Path>> Pipeline<P> for TestPipeline<P> {
 #[test]
 fn run() -> Result<(), BuildError> {
     let tmp = tempdir()?;
+    let cfg = PgConfig::from_map(HashMap::new());
 
     // Test basic success.
-    let pipe = TestPipeline::new(&tmp, false);
+    let pipe = TestPipeline::new(&tmp, cfg, false);
     if let Err(e) = pipe.run("echo", ["hello"], false) {
         panic!("echo hello failed: {e}");
     }
@@ -95,8 +102,9 @@ fn run() -> Result<(), BuildError> {
 #[test]
 fn is_writeable() -> Result<(), BuildError> {
     let tmp = tempdir()?;
+    let cfg = PgConfig::from_map(HashMap::new());
 
-    let pipe = TestPipeline::new(&tmp, false);
+    let pipe = TestPipeline::new(&tmp, cfg, false);
     assert!(pipe.is_writeable(&tmp));
     assert!(!pipe.is_writeable(tmp.path().join(" nonesuch")));
 

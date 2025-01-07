@@ -3,6 +3,7 @@
 //! [pgrx]: https://github.com/pgcentralfoundation/pgrx
 
 use crate::error::BuildError;
+use crate::pg_config::PgConfig;
 use crate::pipeline::Pipeline;
 use std::path::Path;
 
@@ -12,17 +13,23 @@ use std::path::Path;
 #[derive(Debug, PartialEq)]
 pub(crate) struct Pgrx<P: AsRef<Path>> {
     sudo: bool,
+    cfg: PgConfig,
     dir: P,
 }
 
 impl<P: AsRef<Path>> Pipeline<P> for Pgrx<P> {
-    fn new(dir: P, sudo: bool) -> Self {
-        Pgrx { sudo, dir }
+    fn new(dir: P, cfg: PgConfig, sudo: bool) -> Self {
+        Pgrx { sudo, cfg, dir }
     }
 
     /// Returns the directory passed to [`Self::new`].
     fn dir(&self) -> &P {
         &self.dir
+    }
+
+    /// Returns the PgConfig passed to [`Self::new`].
+    fn pg_config(&self) -> &PgConfig {
+        &self.cfg
     }
 
     /// Determines the confidence that the Pgrx pipeline can build the

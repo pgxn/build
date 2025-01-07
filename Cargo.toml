@@ -16,23 +16,23 @@ exclude = [ ".github", ".vscode", ".gitignore", ".ci", ".pre-*.yaml"]
 
 [dependencies]
 cargo_toml = "0.21.0"
-chrono = "0.4.38"
+chrono = "0.4.39"
 hex = "0.4.3"
 iri-string = "0.7.7"
 log = { version = "0.4.22", features = ["kv"] }
-pgxn_meta = "0.5.1"
+pgxn_meta = "0.5.2"
 regex = "1.11.1"
-semver = "1.0.23"
-serde = "1.0.215"
-serde_json = "1.0.133"
-tempfile = "3.14.0"
-thiserror = "2.0.4"
+semver = "1.0.24"
+serde = "1.0.217"
+serde_json = "1.0.135"
+tempfile = "3.15.0"
+thiserror = "2.0.9"
 ureq = { version = "2.12.1", features = ["json"] }
 url = "2.5.4"
-zip = "2.2.1"
+zip = "2.2.2"
 
 [dev-dependencies]
 httpmock = "0.7.0"
 sha2 = "0.10.8"
 temp-env = "0.3.6"
-assertables = "9.4.0"
+assertables = "9.5.0"

@@ -956,7 +956,7 @@ fn unpack() -> Result<(), BuildError> {
     let res = api.unpack(tmp_dir.as_ref(), &idx);
     assert!(res.is_err());
     assert_eq!(
-        "invalid Zip archive: No valid central directory found",
+        "invalid Zip archive: Could not find EOCD",
         res.unwrap_err().to_string()
     );
 

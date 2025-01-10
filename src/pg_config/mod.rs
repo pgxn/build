@@ -48,7 +48,7 @@ impl PgConfig {
 
     /// Returns the `pg_config` value for `cfg`, which should be a lowercase
     /// string.
-    pub fn get(&mut self, cfg: &str) -> Option<&str> {
+    pub fn get(&self, cfg: &str) -> Option<&str> {
         match self.0.get(cfg) {
             Some(c) => Some(c.as_str()),
             None => None,

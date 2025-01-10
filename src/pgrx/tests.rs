@@ -28,25 +28,23 @@ fn confidence() -> Result<(), BuildError> {
 fn new() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let cfg = PgConfig::from_map(HashMap::new());
-    let pipe = Pgrx::new(dir, cfg.clone(), false);
+    let pipe = Pgrx::new(dir, cfg.clone());
     assert_eq!(dir, pipe.dir);
     assert_eq!(&dir, pipe.dir());
     assert_eq!(&cfg, pipe.pg_config());
-    assert!(!pipe.sudo);
 
     let dir2 = dir.join("corpus");
     let cfg2 = PgConfig::from_map(HashMap::from([("bindir".to_string(), "bin".to_string())]));
-    let pipe = Pgrx::new(dir2.as_path(), cfg2.clone(), true);
+    let pipe = Pgrx::new(dir2.as_path(), cfg2.clone());
     assert_eq!(dir2, pipe.dir);
     assert_eq!(&dir2, pipe.dir());
     assert_eq!(&cfg2, pipe.pg_config());
-    assert!(pipe.sudo);
 }
 
 #[test]
 fn configure_et_al() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let pipe = Pgrx::new(dir, PgConfig::from_map(HashMap::new()), false);
+    let pipe = Pgrx::new(dir, PgConfig::from_map(HashMap::new()));
     assert!(pipe.configure().is_ok());
     assert!(pipe.compile().is_ok());
     assert!(pipe.test().is_ok());

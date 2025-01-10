@@ -12,7 +12,7 @@ struct TestPipeline<P: AsRef<Path>> {
 // Create a mock version of the trait.
 #[cfg(test)]
 impl<P: AsRef<Path>> Pipeline<P> for TestPipeline<P> {
-    fn new(dir: P, cfg: PgConfig, _: bool) -> Self {
+    fn new(dir: P, cfg: PgConfig) -> Self {
         TestPipeline { dir, cfg }
     }
 
@@ -47,7 +47,7 @@ fn run() -> Result<(), BuildError> {
     let cfg = PgConfig::from_map(HashMap::new());
 
     // Test basic success.
-    let pipe = TestPipeline::new(&tmp, cfg, false);
+    let pipe = TestPipeline::new(&tmp, cfg);
     if let Err(e) = pipe.run("echo", ["hello"], false) {
         panic!("echo hello failed: {e}");
     }
@@ -104,9 +104,44 @@ fn is_writeable() -> Result<(), BuildError> {
     let tmp = tempdir()?;
     let cfg = PgConfig::from_map(HashMap::new());
 
-    let pipe = TestPipeline::new(&tmp, cfg, false);
+    let pipe = TestPipeline::new(&tmp, cfg);
     assert!(pipe.is_writeable(&tmp));
     assert!(!pipe.is_writeable(tmp.path().join(" nonesuch")));
+
+    Ok(())
+}
+
+#[test]
+fn maybe_sudo() -> Result<(), BuildError> {
+    let tmp = tempdir()?;
+    let cfg = PgConfig::from_map(HashMap::from([(
+        "pkglibdir".to_string(),
+        tmp.as_ref().display().to_string(),
+    )]));
+    let pipe = TestPipeline::new(&tmp, cfg);
+
+    // Never use sudo when param is false.
+    let cmd = pipe.maybe_sudo("foo", false);
+    assert_eq!("foo", cmd.get_program().to_str().unwrap());
+
+    // Never use sudo when directory is writeable.
+    let cmd = pipe.maybe_sudo("foo", true);
+    assert_eq!("foo", cmd.get_program().to_str().unwrap());
+
+    // Use sudo when the directory is not writeable.
+    let cfg = PgConfig::from_map(HashMap::from([(
+        "pkglibdir".to_string(),
+        tmp.path().join("nonesuch").display().to_string(),
+    )]));
+    let pipe = TestPipeline::new(&tmp, cfg);
+    let cmd = pipe.maybe_sudo("foo", true);
+    assert_eq!("sudo", cmd.get_program().to_str().unwrap());
+    let args: Vec<&std::ffi::OsStr> = cmd.get_args().collect();
+    assert_eq!(args, &["foo"]);
+
+    // Never use sudo when param is false.
+    let cmd = pipe.maybe_sudo("foo", false);
+    assert_eq!("foo", cmd.get_program().to_str().unwrap());
 
     Ok(())
 }

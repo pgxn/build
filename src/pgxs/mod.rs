@@ -17,14 +17,13 @@ use std::{
 /// [PGXS]: https://www.postgresql.org/docs/current/extend-pgxs.html
 #[derive(Debug, PartialEq)]
 pub(crate) struct Pgxs<P: AsRef<Path>> {
-    sudo: bool,
     cfg: PgConfig,
     dir: P,
 }
 
 impl<P: AsRef<Path>> Pipeline<P> for Pgxs<P> {
-    fn new(dir: P, cfg: PgConfig, sudo: bool) -> Self {
-        Pgxs { sudo, cfg, dir }
+    fn new(dir: P, cfg: PgConfig) -> Self {
+        Pgxs { cfg, dir }
     }
 
     /// Determines the confidence that the Pgxs pipeline can build the
@@ -92,19 +91,19 @@ impl<P: AsRef<Path>> Pipeline<P> for Pgxs<P> {
 
     fn compile(&self) -> Result<(), BuildError> {
         info!("building extension");
-        self.run("make", ["all"], self.sudo)?;
+        self.run("make", ["all"], false)?;
         Ok(())
     }
 
     fn test(&self) -> Result<(), BuildError> {
         info!("testing extension");
-        self.run("make", ["installcheck"], self.sudo)?;
+        self.run("make", ["installcheck"], false)?;
         Ok(())
     }
 
     fn install(&self) -> Result<(), BuildError> {
         info!("installing extension");
-        self.run("make", ["install"], self.sudo)?;
+        self.run("make", ["install"], true)?;
         Ok(())
     }
 }

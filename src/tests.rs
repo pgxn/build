@@ -41,11 +41,11 @@ fn pgxs() {
     let tmp = tempdir().unwrap();
     let cfg = PgConfig::from_map(HashMap::new());
     let rel = Release::try_from(meta.clone()).unwrap();
-    let builder = Builder::new(tmp.as_ref(), rel, cfg, false).unwrap();
+    let builder = Builder::new(tmp.as_ref(), rel, cfg).unwrap();
     let rel = Release::try_from(meta).unwrap();
     let cfg = PgConfig::from_map(HashMap::new());
     let exp = Builder {
-        pipeline: Build::Pgxs(Pgxs::new(tmp.as_ref(), cfg, false)),
+        pipeline: Build::Pgxs(Pgxs::new(tmp.as_ref(), cfg)),
         meta: rel,
     };
     assert_eq!(exp, builder, "pgxs");
@@ -63,10 +63,10 @@ fn pgrx() {
     let tmp = tempdir().unwrap();
     let cfg = PgConfig::from_map(HashMap::new());
     let rel = Release::try_from(meta.clone()).unwrap();
-    let builder = Builder::new(tmp.as_ref(), rel, cfg.clone(), false).unwrap();
+    let builder = Builder::new(tmp.as_ref(), rel, cfg.clone()).unwrap();
     let rel = Release::try_from(meta).unwrap();
     let exp = Builder {
-        pipeline: Build::Pgrx(Pgrx::new(tmp.as_ref(), cfg.clone(), false)),
+        pipeline: Build::Pgrx(Pgrx::new(tmp.as_ref(), cfg.clone())),
         meta: rel,
     };
     assert_eq!(exp, builder, "pgrx");
@@ -84,7 +84,7 @@ fn unsupported_pipeline() {
     let cfg = PgConfig::from_map(HashMap::new());
     assert_eq!(
         BuildError::UnknownPipeline("meson".to_string()).to_string(),
-        Builder::new("dir", rel, cfg, true).unwrap_err().to_string(),
+        Builder::new("dir", rel, cfg).unwrap_err().to_string(),
     );
 }
 
@@ -112,7 +112,7 @@ fn detect_pipeline() -> Result<(), BuildError> {
     let tmp = tempdir()?;
     let dir = tmp.as_ref();
     let cfg = PgConfig::from_map(HashMap::new());
-    match Build::detect(dir, cfg.clone(), true) {
+    match Build::detect(dir, cfg.clone()) {
         Ok(_) => panic!("detect unexpectedly succeeded with empty dir"),
         Err(e) => assert_eq!(
             "cannot detect build pipeline and none specified",
@@ -120,7 +120,7 @@ fn detect_pipeline() -> Result<(), BuildError> {
         ),
     }
     for meta in &metas {
-        match Builder::new(dir, no_pipe(meta), cfg.clone(), true) {
+        match Builder::new(dir, no_pipe(meta), cfg.clone()) {
             Ok(_) => panic!("detect unexpectedly succeeded with empty dir"),
             Err(e) => assert_eq!(
                 "cannot detect build pipeline and none specified",
@@ -131,25 +131,25 @@ fn detect_pipeline() -> Result<(), BuildError> {
 
     // Add an empty Makefile, PGXS should win.
     let mut makefile = File::create(dir.join("Makefile"))?;
-    match Build::detect(dir, cfg.clone(), true) {
-        Ok(p) => assert_eq!(Build::Pgxs(Pgxs::new(dir, cfg.clone(), true)), p),
+    match Build::detect(dir, cfg.clone()) {
+        Ok(p) => assert_eq!(Build::Pgxs(Pgxs::new(dir, cfg.clone())), p),
         Err(e) => panic!("Unexpectedly errored with Makefile: {e}"),
     }
     for meta in &metas {
-        match Builder::new(dir, no_pipe(meta), cfg.clone(), true) {
-            Ok(b) => assert_eq!(Build::Pgxs(Pgxs::new(dir, cfg.clone(), true)), b.pipeline),
+        match Builder::new(dir, no_pipe(meta), cfg.clone()) {
+            Ok(b) => assert_eq!(Build::Pgxs(Pgxs::new(dir, cfg.clone())), b.pipeline),
             Err(e) => panic!("Unexpectedly errored with Makefile: {e}"),
         }
     }
     // Add an empty cargo.toml, PGXS should still win.
     let mut cargo_toml = File::create(dir.join("Cargo.toml"))?;
-    match Build::detect(dir, cfg.clone(), false) {
-        Ok(p) => assert_eq!(Build::Pgxs(Pgxs::new(dir, cfg.clone(), false)), p),
+    match Build::detect(dir, cfg.clone()) {
+        Ok(p) => assert_eq!(Build::Pgxs(Pgxs::new(dir, cfg.clone())), p),
         Err(e) => panic!("Unexpectedly errored with Cargo.toml: {e}"),
     }
     for meta in &metas {
-        match Builder::new(dir, no_pipe(meta), cfg.clone(), true) {
-            Ok(b) => assert_eq!(Build::Pgxs(Pgxs::new(dir, cfg.clone(), true)), b.pipeline),
+        match Builder::new(dir, no_pipe(meta), cfg.clone()) {
+            Ok(b) => assert_eq!(Build::Pgxs(Pgxs::new(dir, cfg.clone())), b.pipeline),
             Err(e) => panic!("Unexpectedly errored with Cargo.toml: {e}"),
         }
     }
@@ -157,13 +157,13 @@ fn detect_pipeline() -> Result<(), BuildError> {
     // Add pgrx to Cargo.toml; now pgrx should win.
     writeln!(&cargo_toml, "[dependencies]\npgrx = \"0.12.6\"")?;
     cargo_toml.flush()?;
-    match Build::detect(dir, cfg.clone(), true) {
-        Ok(p) => assert_eq!(Build::Pgrx(Pgrx::new(dir, cfg.clone(), true)), p),
+    match Build::detect(dir, cfg.clone()) {
+        Ok(p) => assert_eq!(Build::Pgrx(Pgrx::new(dir, cfg.clone())), p),
         Err(e) => panic!("Unexpectedly errored with pgrx dependency: {e}"),
     }
     for meta in &metas {
-        match Builder::new(dir, no_pipe(meta), cfg.clone(), false) {
-            Ok(b) => assert_eq!(Build::Pgrx(Pgrx::new(dir, cfg.clone(), false)), b.pipeline),
+        match Builder::new(dir, no_pipe(meta), cfg.clone()) {
+            Ok(b) => assert_eq!(Build::Pgrx(Pgrx::new(dir, cfg.clone())), b.pipeline),
             Err(e) => panic!("Unexpectedly errored with pgrx dependency: {e}"),
         }
     }
@@ -171,17 +171,17 @@ fn detect_pipeline() -> Result<(), BuildError> {
     // Add PG_CONFIG to the Makefile, PGXS should win again.
     writeln!(&makefile, "PG_CONFIG ?= pg_config")?;
     makefile.flush()?;
-    match Build::detect(dir, cfg.clone(), false) {
+    match Build::detect(dir, cfg.clone()) {
         Ok(p) => assert_eq!(
-            Build::Pgxs(Pgxs::new(dir, PgConfig::from_map(HashMap::new()), false)),
+            Build::Pgxs(Pgxs::new(dir, PgConfig::from_map(HashMap::new()))),
             p
         ),
         Err(e) => panic!("Unexpectedly errored with PG_CONFIG var: {e}"),
     }
     for meta in &metas {
-        match Builder::new(dir, no_pipe(meta), cfg.clone(), false) {
+        match Builder::new(dir, no_pipe(meta), cfg.clone()) {
             Ok(b) => assert_eq!(
-                Build::Pgxs(Pgxs::new(dir, PgConfig::from_map(HashMap::new()), false)),
+                Build::Pgxs(Pgxs::new(dir, PgConfig::from_map(HashMap::new()))),
                 b.pipeline
             ),
             Err(e) => panic!("Unexpectedly errored with PG_CONFIG var: {e}"),

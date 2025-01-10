@@ -12,14 +12,13 @@ use std::path::Path;
 /// [pgrx]: https://github.com/pgcentralfoundation/pgrx
 #[derive(Debug, PartialEq)]
 pub(crate) struct Pgrx<P: AsRef<Path>> {
-    sudo: bool,
     cfg: PgConfig,
     dir: P,
 }
 
 impl<P: AsRef<Path>> Pipeline<P> for Pgrx<P> {
-    fn new(dir: P, cfg: PgConfig, sudo: bool) -> Self {
-        Pgrx { sudo, cfg, dir }
+    fn new(dir: P, cfg: PgConfig) -> Self {
+        Pgrx { cfg, dir }
     }
 
     /// Returns the directory passed to [`Self::new`].

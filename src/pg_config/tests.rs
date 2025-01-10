@@ -29,7 +29,7 @@ fn pg_config() -> Result<(), BuildError> {
     ]);
 
     // Parse its output.
-    let mut cfg = PgConfig::new(&path)?;
+    let cfg = PgConfig::new(&path)?;
     assert_eq!(&exp, &cfg.0);
 
     // Get lowercase.

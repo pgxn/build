@@ -71,7 +71,7 @@ fn run() -> Result<(), BuildError> {
         Ok(_) => panic!("exit_err unexpectedly succeeded"),
         Err(e) => {
             assert_starts_with!(e.to_string(), "executing");
-            assert_ends_with!(e.to_string(), " DED: hi\n");
+            assert_ends_with!(e.to_string(), " exited with status code: 2");
         }
     }
 

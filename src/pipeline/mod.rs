@@ -75,12 +75,15 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
         let mut cmd = self.maybe_sudo(program, sudo);
         cmd.args(args);
         cmd.current_dir(self.dir());
-        match cmd.output() {
-            Ok(out) => {
-                if !out.status.success() {
+        match cmd.status() {
+            Ok(status) => {
+                if !status.success() {
                     return Err(BuildError::Command(
                         format!("{:?}", cmd),
-                        String::from_utf8_lossy(&out.stderr).to_string(),
+                        match status.code() {
+                            Some(code) => format!("exited with status code: {code}"),
+                            None => "process terminated by signal".to_string(),
+                        },
                     ));
                 }
                 Ok(())

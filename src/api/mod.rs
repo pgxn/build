@@ -60,18 +60,17 @@ impl Api {
         static APP_USER_AGENT: &str =
             concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
-        let mut builder = ureq::AgentBuilder::new()
-            .timeout_read(Duration::from_secs(5))
-            .timeout_write(Duration::from_secs(5))
+        let mut builder = ureq::Agent::config_builder()
+            .timeout_global(Some(Duration::from_secs(5)))
             .https_only(true)
             .user_agent(APP_USER_AGENT);
 
         if let Some(p) = proxy {
-            builder = builder.proxy(ureq::Proxy::new(p)?);
+            builder = builder.proxy(Some(ureq::Proxy::new(p)?));
         }
 
         let url = parse_base_url(url)?;
-        let agent = builder.build();
+        let agent: ureq::Agent = builder.build().into();
         let idx = url.join("index.json")?;
         let templates = fetch_templates(&agent, &idx)?;
 
@@ -198,14 +197,14 @@ impl Api {
                 }
 
                 // Download the file over HTTP.
-                let res = self.agent.request_url("GET", &url).call()?;
+                let res = self.agent.get(url.as_str()).call()?;
                 match File::create(&dst) {
                     Err(e) => Err(BuildError::File(
                         "creating",
                         dst.display().to_string(),
                         e.kind(),
                     )),
-                    Ok(mut out) => match io::copy(&mut res.into_reader(), &mut out) {
+                    Ok(mut out) => match io::copy(&mut res.into_body().as_reader(), &mut out) {
                         Ok(_) => Ok(dst),
                         Err(e) => copy_err!(url, dst, e),
                     },
@@ -233,13 +232,13 @@ fn fetch_json(agent: &ureq::Agent, url: &url::Url) -> Result<Value, BuildError> 
         "file" => Ok(serde_json::from_reader(get_file(url)?)?),
         // Avoid .into_json(); it returns IO errors.
         "http" | "https" => Ok(serde_json::from_reader(
-            agent.request_url("GET", url).call()?.into_reader(),
+            agent.get(url.as_str()).call()?.into_body().as_reader(),
         )?),
         s => Err(BuildError::Scheme(s.to_string())),
     }
 }
 
-/// Fetches the JSON at URL and converts it to a serde_json::Value.
+/// Fetches the JSON at URL and converts it to an io::Read.
 fn fetch_reader(
     agent: &ureq::Agent,
     url: &url::Url,
@@ -247,8 +246,9 @@ fn fetch_reader(
     debug!(url:display; "fetching");
     match url.scheme() {
         "file" => Ok(Box::new(get_file(url)?)),
-        // Avoid .into_json(); it returns IO errors.
-        "http" | "https" => Ok(agent.request_url("GET", url).call()?.into_reader()),
+        "http" | "https" => Ok(Box::new(
+            agent.get(url.as_str()).call()?.into_body().into_reader(),
+        )),
         s => Err(BuildError::Scheme(s.to_string())),
     }
 }

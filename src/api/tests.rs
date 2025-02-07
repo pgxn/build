@@ -3,7 +3,6 @@ use httpmock::prelude::*;
 use sha2::{Digest, Sha256};
 use std::io::Read;
 use tempfile::tempdir;
-use ureq::json;
 
 fn corpus_dir() -> Box<std::path::PathBuf> {
     Box::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("corpus"))
@@ -11,7 +10,7 @@ fn corpus_dir() -> Box<std::path::PathBuf> {
 
 fn ua() -> String {
     format!(
-        "user_agent: \"{}\"",
+        "user_agent: Provided(\"{}\")",
         concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"))
     )
 }
@@ -26,8 +25,7 @@ fn constructor() -> Result<(), BuildError> {
     let idx = exp_url.join("index.json")?;
     assert_eq!(fetch_templates(&api.agent, &idx)?, api.templates);
     let cfg = format!("{:?}", api.agent);
-    assert!(cfg.contains("timeout_read: Some(5s)"));
-    assert!(cfg.contains("timeout_write: Some(5s)"));
+    assert!(cfg.contains("timeouts: Timeouts { global: Some(5s)"));
     assert!(cfg.contains("https_only: true"));
     let ua = ua();
     assert!(cfg.contains(&ua));
@@ -46,12 +44,12 @@ fn constructor_proxy() -> Result<(), BuildError> {
     let idx = exp_url.join("index.json")?;
     assert_eq!(fetch_templates(&api.agent, &idx)?, api.templates);
     let cfg = format!("{:?}", api.agent);
-    assert!(cfg.contains("timeout_read: Some(5s)"));
-    assert!(cfg.contains("timeout_write: Some(5s)"));
+    assert!(cfg.contains("timeouts: Timeouts { global: Some(5s)"));
     assert!(cfg.contains("https_only: true"));
     let ua = ua();
     assert!(cfg.contains(&ua));
-    assert!(cfg.contains("Some(Proxy { server: \"socks.google.com\", port: 1080, user: Some(\"john\"), password: Some(\"smith\"), proto: SOCKS5 })"));
+    println!("{cfg}");
+    assert!(cfg.contains("Some(Proxy { proto: Socks5, uri: socks5://j*****:******@socks.google.com/******, from_env: false })"));
 
     Ok(())
 }
@@ -173,13 +171,17 @@ fn download_file_errors() -> Result<(), BuildError> {
             "not tls",
             dst.as_path(),
             "http://example.com/foo.text".to_string(),
-            "http://example.com/foo.text: Insecure request attempted with https_only set: can't perform non https request with https_only set".to_string(),
+            "configured for https only: http://example.com/foo.text".to_string(),
         ),
         (
             "nonexistent file",
             dst.as_path(),
             format!("file://{}", dir.join("nope.txt").display()),
-            format!("opening {}: {}", dir.join("nope.txt").display(), io::ErrorKind::NotFound),
+            format!(
+                "opening {}: {}",
+                dir.join("nope.txt").display(),
+                io::ErrorKind::NotFound
+            ),
         ),
         (
             "nonexistent destination",
@@ -416,7 +418,7 @@ fn fetch_reader_fn() -> Result<(), BuildError> {
     let url = Url::parse(&server.url("/nonesuch.json"))?;
     match fetch_reader(&agent, &url) {
         Ok(_) => panic!("404 unexpectedly succeeded"),
-        Err(e) => assert_eq!(format!("{url}: status code 404"), e.to_string(), "404"),
+        Err(e) => assert_eq!(format!("http status: 404"), e.to_string(), "404"),
     }
     mock.assert();
 
@@ -457,10 +459,9 @@ fn fetch_json_http() -> Result<(), BuildError> {
     });
 
     let url = base_url.join("/xyz/nonesuch.json")?;
-    let exp = format!("{url}: status code 404");
     match fetch_json(&agent, &url) {
         Ok(_) => panic!("404 unexpectedly succeeded"),
-        Err(e) => assert_eq!(exp, e.to_string(), "404"),
+        Err(e) => assert_eq!("http status: 404", e.to_string(), "404"),
     }
     mock.assert();
 

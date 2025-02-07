@@ -18,6 +18,10 @@ cover:
 docs: target/doc/pgxn_build/index.html
 	open $<
 
+.PHONY: update-deps # Update dependencies to the latest versions.
+update-deps:
+	cargo upgrade -i allow && cargo update
+
 target/doc/pgxn_build/index.html: $(shell find . -name \*.rs)
 	cargo doc
 

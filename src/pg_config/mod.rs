@@ -1,3 +1,4 @@
+//! Interface to the `pg_config` utility.
 use std::{
     collections::{self, HashMap},
     io::{BufRead, BufReader},
@@ -7,6 +8,7 @@ use std::{
 
 use crate::error::BuildError;
 
+/// Access values from the `pg_config` utility.
 #[derive(Debug, PartialEq, Clone)]
 pub struct PgConfig(HashMap<String, String>);
 

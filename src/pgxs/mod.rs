@@ -4,7 +4,7 @@
 
 use crate::pipeline::Pipeline;
 use crate::{error::BuildError, pg_config::PgConfig};
-use log::info;
+use log::{debug, info};
 use regex::Regex;
 use std::{
     fs::{self, File},
@@ -114,6 +114,7 @@ fn makefile(dir: &Path) -> Option<PathBuf> {
     for makefile in ["GNUmakefile", "makefile", "Makefile"] {
         let file = dir.join(makefile);
         if file.exists() {
+            debug!("Found {:?}", file);
             return Some(file);
         }
     }

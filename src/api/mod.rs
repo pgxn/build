@@ -9,7 +9,7 @@ pub use dist::{Dist, Release, Releases};
 use crate::error::BuildError;
 use iri_string::spec;
 use iri_string::template::{simple_context::SimpleContext, UriTemplateStr, UriTemplateString};
-use log::{debug, info, trace};
+use log::{debug, info};
 use semver::Version;
 use serde_json::{json, Value};
 use std::{
@@ -102,7 +102,7 @@ impl Api {
         ctx.insert("version", version.to_string());
         let url = self.url_for("meta", ctx)?;
         let mut val = fetch_json(&self.agent, &url)?;
-        debug!(url:display; "parsing");
+        debug!(url:?; "parsing");
         if val.get("meta-spec").is_none() {
             // PGXN v1 stripped meta-spec out of this API :-/.
             let val_type = type_of!(val);
@@ -117,7 +117,7 @@ impl Api {
     /// Unpack download `file` in directory `into` and return the path to the
     /// unpacked directory.
     pub fn unpack<P: AsRef<Path>>(&self, into: P, file: P) -> Result<PathBuf, BuildError> {
-        info!(file:display = crate::filename(&file); "unpacking");
+        info!(archive:? = crate::filename(&file); "Unpacking");
         let zip = File::open(file)?;
         let mut archive = zip::ZipArchive::new(zip)?;
         archive.extract(&into)?;
@@ -137,7 +137,7 @@ impl Api {
             .ok_or_else(|| BuildError::UnknownTemplate(name.to_string()))?;
         let path = template.expand::<spec::UriSpec, _>(&ctx)?;
         let url = self.url.join(&path.to_string())?;
-        trace!(url:display; "resolved URL");
+        debug!(url:?; "Resolved");
         Ok(url)
     }
 
@@ -152,10 +152,9 @@ impl Api {
         ctx.insert("dist", meta.name());
         ctx.insert("version", meta.version().to_string());
         let url = self.url_for("download", ctx)?;
-        info!(url:display; "downloading");
         let file = self.download_url_to(dir, url)?;
-        info!(file:display = file.display(); "validating");
         meta.release().digests().validate(&file)?;
+
         Ok(file)
     }
 
@@ -166,7 +165,7 @@ impl Api {
         dir: P,
         url: url::Url,
     ) -> Result<PathBuf, BuildError> {
-        trace!( url:display, dir:display = dir.as_ref().display(); "downloading");
+        info!(from:% = url, to:?=dir.as_ref(); "Downloading");
         // Extract the file name from the URL.
         match url.path_segments() {
             None => Err(BuildError::NoUrlFile(url))?,
@@ -183,31 +182,40 @@ impl Api {
                     // Copy the file. Eschew std::fs::copy for better
                     // error messages.
                     let mut input = get_file(&url)?;
+                    debug!(destination:?=dst; "Create");
                     return match File::create(&dst) {
                         Err(e) => Err(BuildError::File(
                             "creating",
                             dst.display().to_string(),
                             e.kind(),
                         )),
-                        Ok(mut out) => match io::copy(&mut input, &mut out) {
-                            Ok(_) => Ok(dst),
-                            Err(e) => copy_err!(url.to_file_path().unwrap().display(), dst, e),
-                        },
+                        Ok(mut out) => {
+                            debug!(to:?=dst; "Copy");
+                            match io::copy(&mut input, &mut out) {
+                                Ok(_) => Ok(dst),
+                                Err(e) => copy_err!(url.to_file_path().unwrap().display(), dst, e),
+                            }
+                        }
                     };
                 }
 
                 // Download the file over HTTP.
+                debug!(url:%; "GET");
                 let res = self.agent.get(url.as_str()).call()?;
+                debug!(destination:?=dst; "Create");
                 match File::create(&dst) {
                     Err(e) => Err(BuildError::File(
                         "creating",
                         dst.display().to_string(),
                         e.kind(),
                     )),
-                    Ok(mut out) => match io::copy(&mut res.into_body().as_reader(), &mut out) {
-                        Ok(_) => Ok(dst),
-                        Err(e) => copy_err!(url, dst, e),
-                    },
+                    Ok(mut out) => {
+                        debug!(to:?=dst; "Copy");
+                        match io::copy(&mut res.into_body().as_reader(), &mut out) {
+                            Ok(_) => Ok(dst),
+                            Err(e) => copy_err!(url, dst, e),
+                        }
+                    }
                 }
             }
         }
@@ -227,7 +235,7 @@ fn parse_base_url(url: &str) -> Result<url::Url, url::ParseError> {
 
 /// Fetches the JSON at URL and converts it to a serde_json::Value.
 fn fetch_json(agent: &ureq::Agent, url: &url::Url) -> Result<Value, BuildError> {
-    debug!(url:display; "fetching");
+    debug!(url:?; "fetching");
     match url.scheme() {
         "file" => Ok(serde_json::from_reader(get_file(url)?)?),
         // Avoid .into_json(); it returns IO errors.
@@ -243,7 +251,7 @@ fn fetch_reader(
     agent: &ureq::Agent,
     url: &url::Url,
 ) -> Result<Box<dyn io::Read + Send + Sync + 'static>, BuildError> {
-    debug!(url:display; "fetching");
+    debug!(url:?; "fetching");
     match url.scheme() {
         "file" => Ok(Box::new(get_file(url)?)),
         "http" | "https" => Ok(Box::new(
@@ -260,6 +268,7 @@ fn get_file(url: &url::Url) -> Result<File, BuildError> {
         Err(_) => Err(BuildError::NoUrlFile(url.clone()))?,
         Ok(s) => s,
     };
+    debug!(file:? = src; "Source");
     // if src.is_dir() {
     //     return Err(BuildError::File(
     //         "opening",

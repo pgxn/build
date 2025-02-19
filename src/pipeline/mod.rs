@@ -2,7 +2,12 @@
 
 use crate::{error::BuildError, pg_config::PgConfig};
 use log::debug;
-use std::{io::Write, path::Path, process::Command};
+use scopeguard::defer;
+use std::{
+    io::{self, IsTerminal, Write},
+    path::Path,
+    process::Command,
+};
 
 /// Defines the interface for build pipelines to configure, compile, and test
 /// PGXN distributions.
@@ -53,7 +58,7 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
     /// Attempts to write a temporary file to `dir` and returns `true` on
     /// success and `false` on failure. The temporary file will be deleted.
     fn is_writeable<D: AsRef<Path>>(&self, dir: D) -> bool {
-        debug!(dir:display = crate::filename(&dir); "testing write access");
+        debug!(dir:? = crate::filename(&dir); "testing write access");
         match tempfile::Builder::new()
             .prefix("pgxn-")
             .suffix(".test")
@@ -71,10 +76,30 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
         I: IntoIterator<Item = S>,
         S: AsRef<std::ffi::OsStr>,
     {
+        // Set up STDOUT to be dimmed grey.
+        let grey = ansi_term::Color::Fixed(244).dimmed();
+        let mut stdout = io::stdout();
+        if stdout.is_terminal() {
+            write!(stdout, "{}", grey.prefix())?;
+        }
+
+        // Set up STDERR to be red.
+        let mut stderr = io::stderr();
+        let red = ansi_term::Color::Red;
+        if stderr.is_terminal() {
+            write!(stderr, "{}", red.prefix())?;
+        }
+
+        // Reset colors when this function exits.
+        defer! {
+            if stderr.is_terminal() { _= write!(stderr, "{}", red.suffix()) }
+            if stdout.is_terminal() { _= write!(stdout, "{}", grey.suffix()) }
+        };
+
         // Use `sudo` if the param is set.
         let mut cmd = self.maybe_sudo(program, sudo);
-        cmd.args(args);
-        cmd.current_dir(self.dir());
+        cmd.args(args).current_dir(self.dir());
+        debug!(command:? = cmd; "Executing");
         match cmd.status() {
             Ok(status) => {
                 if !status.success() {

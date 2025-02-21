@@ -1,11 +1,13 @@
 //! Build Pipeline interface definition.
 
 use crate::{error::BuildError, pg_config::PgConfig};
+use color_print::cwriteln;
 use log::debug;
 use std::{
     io::{self, BufRead, BufReader, IsTerminal, Write},
     path::Path,
     process::{Command, Stdio},
+    thread,
 };
 
 /// Defines the interface for build pipelines to configure, compile, and test
@@ -84,68 +86,53 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
 
 fn pipe_command<O, E>(mut cmd: Command, mut out: O, mut err: E) -> Result<(), BuildError>
 where
-    O: io::Write + IsTerminal,
-    E: io::Write + IsTerminal,
+    O: io::Write + IsTerminal + std::marker::Send + 'static,
+    E: io::Write + IsTerminal + std::marker::Send + 'static,
 {
+    // Create pipes from the child's stdout and stderr.
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
-    debug!(command:? = cmd; "Executing");
 
     // Spawn the child process.
+    debug!(command:? = cmd; "Executing");
     let mut child = cmd
         .spawn()
         .map_err(|e| BuildError::Command(format!("{:?}", cmd), e.kind().to_string()))?;
 
-    let grey = ansi_term::Color::Fixed(244).dimmed();
-    let red = ansi_term::Color::Red;
-    {
-        // https://stackoverflow.com/a/41024767/79202
-        let child_out = child
-            .stdout
-            .take()
-            .ok_or_else(|| BuildError::Command(format!("{:?}", cmd), "no stdout".to_string()))?;
-        let child_err = child
-            .stderr
-            .take()
-            .ok_or_else(|| BuildError::Command(format!("{:?}", cmd), "no stderr".to_string()))?;
+    // Grab the stdout and stderr pipes.
+    let child_out = child
+        .stdout
+        .take()
+        .ok_or_else(|| BuildError::Command(format!("{:?}", cmd), "no stdout".to_string()))?;
+    let child_err = child
+        .stderr
+        .take()
+        .ok_or_else(|| BuildError::Command(format!("{:?}", cmd), "no stderr".to_string()))?;
 
-        let mut child_out = BufReader::new(child_out);
-        let mut child_err = BufReader::new(child_err);
-
-        loop {
-            let (stdout_len, stderr_len) = match (child_out.fill_buf(), child_err.fill_buf()) {
-                (Ok(child_out), Ok(child_err)) => {
-                    if out.is_terminal() {
-                        write!(out, "{}", grey.prefix())?;
-                        out.write_all(child_out)?;
-                        write!(out, "{}", grey.suffix())?;
-                    } else {
-                        out.write_all(child_out)?;
-                    }
-                    if err.is_terminal() {
-                        write!(err, "{}", red.prefix())?;
-                        err.write_all(child_err)?;
-                        write!(err, "{}", red.suffix())?;
-                    } else {
-                        err.write_all(child_err)?;
-                    }
-
-                    (child_out.len(), child_err.len())
-                }
-                other => panic!("Some better error handling here... {:?}", other),
-            };
-
-            if stdout_len == 0 && stderr_len == 0 {
-                // if let Ok(Some(_)) = child.try_wait() {
-                break;
-            }
-
-            child_out.consume(stdout_len);
-            child_err.consume(stderr_len);
+    // Read from the pipes and write to final output in separate threads.
+    // https://stackoverflow.com/a/72831067/79202
+    let stdout_thread = thread::spawn(move || -> Result<(), io::Error> {
+        let stdout_lines = BufReader::new(child_out).lines();
+        for line in stdout_lines {
+            cwriteln!(out, "<dim><244>{}</244></dim>", line.unwrap())?;
         }
-    }
+        Ok(())
+    });
 
-    // Execute the command.
-    match child.wait() {
+    let stderr_thread = thread::spawn(move || -> Result<(), io::Error> {
+        let stderr_lines = BufReader::new(child_err).lines();
+        for line in stderr_lines {
+            cwriteln!(err, "<red>{}</red>", line.unwrap())?;
+        }
+        Ok(())
+    });
+
+    // Wait for the child and output threads to finish.
+    let res = child.wait();
+    stdout_thread.join().unwrap()?;
+    stderr_thread.join().unwrap()?;
+
+    // Determine how the command finished.
+    match res {
         Ok(status) => {
             if !status.success() {
                 return Err(BuildError::Command(

@@ -77,105 +77,91 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
     {
         // Use `sudo` if the param is set.
         let mut cmd = self.maybe_sudo(program, sudo);
-        cmd.args(args)
-            .current_dir(self.dir())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        debug!(command:? = cmd; "Executing");
+        cmd.args(args).current_dir(self.dir());
+        pipe_command(cmd, io::stdout(), io::stderr())
+    }
+}
 
-        let mut child = cmd
-            .spawn()
-            .map_err(|e| BuildError::Command(format!("{:?}", cmd), e.kind().to_string()))?;
-        let mut stdout = io::stdout();
-        let mut stderr = io::stderr();
-        let grey = ansi_term::Color::Fixed(244).dimmed();
-        let red = ansi_term::Color::Red;
-        {
-            let child_out = child.stdout.take().ok_or_else(|| {
-                BuildError::Command(format!("{:?}", cmd), "no stdout".to_string())
-            })?;
-            let child_err = child.stderr.take().ok_or_else(|| {
-                BuildError::Command(format!("{:?}", cmd), "no stderr".to_string())
-            })?;
+fn pipe_command<O, E>(mut cmd: Command, mut out: O, mut err: E) -> Result<(), BuildError>
+where
+    O: io::Write + IsTerminal,
+    E: io::Write + IsTerminal,
+{
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    debug!(command:? = cmd; "Executing");
 
-            let mut child_out = BufReader::new(child_out);
-            let mut child_err = BufReader::new(child_err);
+    // Spawn the child process.
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| BuildError::Command(format!("{:?}", cmd), e.kind().to_string()))?;
 
-            loop {
-                let (stdout_bytes, stderr_bytes) =
-                    match (child_out.fill_buf(), child_err.fill_buf()) {
-                        (Ok(child_out), Ok(child_err)) => {
-                            if stdout.is_terminal() {
-                                write!(stdout, "{}", grey.prefix())?;
-                                stdout.write_all(child_out)?;
-                                write!(stdout, "{}", grey.suffix())?;
-                            } else {
-                                stdout.write_all(child_out)?;
-                            }
-                            if stderr.is_terminal() {
-                                write!(stderr, "{}", red.prefix())?;
-                                stderr.write_all(child_err)?;
-                                write!(stderr, "{}", red.suffix())?;
-                            } else {
-                                stderr.write_all(child_err)?;
-                            }
+    let grey = ansi_term::Color::Fixed(244).dimmed();
+    let red = ansi_term::Color::Red;
+    {
+        // https://stackoverflow.com/a/41024767/79202
+        let child_out = child
+            .stdout
+            .take()
+            .ok_or_else(|| BuildError::Command(format!("{:?}", cmd), "no stdout".to_string()))?;
+        let child_err = child
+            .stderr
+            .take()
+            .ok_or_else(|| BuildError::Command(format!("{:?}", cmd), "no stderr".to_string()))?;
 
-                            (child_out.len(), child_err.len())
-                        }
-                        other => panic!("Some better error handling here... {:?}", other),
-                    };
+        let mut child_out = BufReader::new(child_out);
+        let mut child_err = BufReader::new(child_err);
 
-                if stdout_bytes == 0 && stderr_bytes == 0 {
-                    // Seems less-than-ideal; should be some way of
-                    // telling if the child has actually exited vs just
-                    // not outputting anything.
-                    break;
+        loop {
+            let (stdout_len, stderr_len) = match (child_out.fill_buf(), child_err.fill_buf()) {
+                (Ok(child_out), Ok(child_err)) => {
+                    if out.is_terminal() {
+                        write!(out, "{}", grey.prefix())?;
+                        out.write_all(child_out)?;
+                        write!(out, "{}", grey.suffix())?;
+                    } else {
+                        out.write_all(child_out)?;
+                    }
+                    if err.is_terminal() {
+                        write!(err, "{}", red.prefix())?;
+                        err.write_all(child_err)?;
+                        write!(err, "{}", red.suffix())?;
+                    } else {
+                        err.write_all(child_err)?;
+                    }
+
+                    (child_out.len(), child_err.len())
                 }
+                other => panic!("Some better error handling here... {:?}", other),
+            };
 
-                child_out.consume(stdout_bytes);
-                child_err.consume(stderr_bytes);
+            if stdout_len == 0 && stderr_len == 0 {
+                // if let Ok(Some(_)) = child.try_wait() {
+                break;
             }
+
+            child_out.consume(stdout_len);
+            child_err.consume(stderr_len);
         }
+    }
 
-        // // Set up STDOUT to be dimmed grey.
-        // let grey = ansi_term::Color::Fixed(244).dimmed();
-        // let mut stdout = io::stdout();
-        // if stdout.is_terminal() {
-        //     write!(stdout, "{}", grey.prefix())?;
-        // }
-
-        // // Set up STDERR to be red.
-        // let mut stderr = io::stderr();
-        // let red = ansi_term::Color::Red;
-        // if stderr.is_terminal() {
-        //     write!(stderr, "{}", red.prefix())?;
-        // }
-
-        // // Reset colors when this function exits.
-        // defer! {
-        //     if stderr.is_terminal() { _= write!(stderr, "{}", red.suffix()) }
-        //     if stdout.is_terminal() { _= write!(stdout, "{}", grey.suffix()) }
-        // };
-
-        // Execute the command.
-        match child.wait() {
-            Ok(status) => {
-                if !status.success() {
-                    return Err(BuildError::Command(
-                        format!("{:?}", cmd),
-                        match status.code() {
-                            Some(code) => format!("exited with status code: {code}"),
-                            None => "process terminated by signal".to_string(),
-                        },
-                    ));
-                }
-                Ok(())
+    // Execute the command.
+    match child.wait() {
+        Ok(status) => {
+            if !status.success() {
+                return Err(BuildError::Command(
+                    format!("{:?}", cmd),
+                    match status.code() {
+                        Some(code) => format!("exited with status code: {code}"),
+                        None => "process terminated by signal".to_string(),
+                    },
+                ));
             }
-            Err(e) => Err(BuildError::Command(
-                format!("{:?}", cmd),
-                e.kind().to_string(),
-            )),
+            Ok(())
         }
+        Err(e) => Err(BuildError::Command(
+            format!("{:?}", cmd),
+            e.kind().to_string(),
+        )),
     }
 }
 

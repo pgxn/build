@@ -2,11 +2,10 @@
 
 use crate::{error::BuildError, pg_config::PgConfig};
 use log::debug;
-use scopeguard::defer;
 use std::{
-    io::{self, IsTerminal, Write},
+    io::{self, BufRead, BufReader, IsTerminal, Write},
     path::Path,
-    process::Command,
+    process::{Command, Stdio},
 };
 
 /// Defines the interface for build pipelines to configure, compile, and test
@@ -76,31 +75,90 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
         I: IntoIterator<Item = S>,
         S: AsRef<std::ffi::OsStr>,
     {
-        // Set up STDOUT to be dimmed grey.
-        let grey = ansi_term::Color::Fixed(244).dimmed();
-        let mut stdout = io::stdout();
-        if stdout.is_terminal() {
-            write!(stdout, "{}", grey.prefix())?;
-        }
-
-        // Set up STDERR to be red.
-        let mut stderr = io::stderr();
-        let red = ansi_term::Color::Red;
-        if stderr.is_terminal() {
-            write!(stderr, "{}", red.prefix())?;
-        }
-
-        // Reset colors when this function exits.
-        defer! {
-            if stderr.is_terminal() { _= write!(stderr, "{}", red.suffix()) }
-            if stdout.is_terminal() { _= write!(stdout, "{}", grey.suffix()) }
-        };
-
         // Use `sudo` if the param is set.
         let mut cmd = self.maybe_sudo(program, sudo);
-        cmd.args(args).current_dir(self.dir());
+        cmd.args(args)
+            .current_dir(self.dir())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
         debug!(command:? = cmd; "Executing");
-        match cmd.status() {
+
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| BuildError::Command(format!("{:?}", cmd), e.kind().to_string()))?;
+        let mut stdout = io::stdout();
+        let mut stderr = io::stderr();
+        let grey = ansi_term::Color::Fixed(244).dimmed();
+        let red = ansi_term::Color::Red;
+        {
+            let child_out = child.stdout.take().ok_or_else(|| {
+                BuildError::Command(format!("{:?}", cmd), "no stdout".to_string())
+            })?;
+            let child_err = child.stderr.take().ok_or_else(|| {
+                BuildError::Command(format!("{:?}", cmd), "no stderr".to_string())
+            })?;
+
+            let mut child_out = BufReader::new(child_out);
+            let mut child_err = BufReader::new(child_err);
+
+            loop {
+                let (stdout_bytes, stderr_bytes) =
+                    match (child_out.fill_buf(), child_err.fill_buf()) {
+                        (Ok(child_out), Ok(child_err)) => {
+                            if stdout.is_terminal() {
+                                write!(stdout, "{}", grey.prefix())?;
+                                stdout.write_all(child_out)?;
+                                write!(stdout, "{}", grey.suffix())?;
+                            } else {
+                                stdout.write_all(child_out)?;
+                            }
+                            if stderr.is_terminal() {
+                                write!(stderr, "{}", red.prefix())?;
+                                stderr.write_all(child_err)?;
+                                write!(stderr, "{}", red.suffix())?;
+                            } else {
+                                stderr.write_all(child_err)?;
+                            }
+
+                            (child_out.len(), child_err.len())
+                        }
+                        other => panic!("Some better error handling here... {:?}", other),
+                    };
+
+                if stdout_bytes == 0 && stderr_bytes == 0 {
+                    // Seems less-than-ideal; should be some way of
+                    // telling if the child has actually exited vs just
+                    // not outputting anything.
+                    break;
+                }
+
+                child_out.consume(stdout_bytes);
+                child_err.consume(stderr_bytes);
+            }
+        }
+
+        // // Set up STDOUT to be dimmed grey.
+        // let grey = ansi_term::Color::Fixed(244).dimmed();
+        // let mut stdout = io::stdout();
+        // if stdout.is_terminal() {
+        //     write!(stdout, "{}", grey.prefix())?;
+        // }
+
+        // // Set up STDERR to be red.
+        // let mut stderr = io::stderr();
+        // let red = ansi_term::Color::Red;
+        // if stderr.is_terminal() {
+        //     write!(stderr, "{}", red.prefix())?;
+        // }
+
+        // // Reset colors when this function exits.
+        // defer! {
+        //     if stderr.is_terminal() { _= write!(stderr, "{}", red.suffix()) }
+        //     if stdout.is_terminal() { _= write!(stdout, "{}", grey.suffix()) }
+        // };
+
+        // Execute the command.
+        match child.wait() {
             Ok(status) => {
                 if !status.success() {
                     return Err(BuildError::Command(

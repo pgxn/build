@@ -1643,7 +1643,6 @@ dependencies = [
  "log",
  "pgxn_meta",
  "regex",
- "scopeguard",
  "semver",
  "serde",
  "serde_json",

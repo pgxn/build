@@ -92,6 +92,7 @@ fn configure() -> Result<(), BuildError> {
     match pipe.configure() {
         Ok(_) => panic!("configure unexpectedly succeeded"),
         Err(e) => {
+            println!("OUTPUT {e}");
             assert_starts_with!(e.to_string(), "executing ");
             assert_ends_with!(
                 e.to_string(),

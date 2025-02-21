@@ -23,7 +23,6 @@ iri-string = "0.7.7"
 log = { version = "0.4.25", features = ["kv"] }
 pgxn_meta = "0.5.2"
 regex = "1.11.1"
-scopeguard = "1.2.0"
 semver = "1.0.25"
 serde = "1.0.217"
 serde_json = "1.0.138"

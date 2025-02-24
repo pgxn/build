@@ -1,5 +1,6 @@
 //! Command execution context.
 use crate::error::BuildError;
+mod color;
 use color_print::cwriteln;
 use log::debug;
 use std::{
@@ -32,7 +33,8 @@ where
     dir: P,
     out: O,
     err: E,
-    color: bool,
+    out_color: bool,
+    err_color: bool,
 }
 
 impl<P, O, E> Executor<P, O, E>
@@ -48,12 +50,14 @@ where
     /// refers to a terminal, while lines sent to STDERR will be red if it
     /// refers to a terminal.
     pub fn new(dir: P, out: O, err: E, color: bool) -> Self {
-        println!("OUT IS? {}", out.is_terminal());
+        let out_color = color || color::on(&out).is_some();
+        let err_color = color || color::on(&err).is_some();
         Self {
             dir,
             out,
             err,
-            color,
+            out_color,
+            err_color,
         }
     }
 
@@ -104,7 +108,7 @@ where
         });
 
         // Read the lines from the spawned threads and format them as appropriate.
-        if !self.color || (!self.out.is_terminal() && !self.err.is_terminal()) {
+        if !self.out_color && !self.err_color {
             // No color wanted or allowed. Just write the unmodified output.
             for output in rx {
                 if output.is_err {
@@ -113,7 +117,7 @@ where
                     writeln!(self.out, "{}", output.line)?;
                 }
             }
-        } else if self.out.is_terminal() && self.err.is_terminal() {
+        } else if self.out_color && self.err_color {
             // Write colored output to both outputs.
             for output in rx {
                 if output.is_err {
@@ -122,7 +126,7 @@ where
                     cwriteln!(self.out, "<dim><244>{}</244></dim>", output.line)?;
                 }
             }
-        } else if self.out.is_terminal() {
+        } else if self.out_color {
             // Write colored output only to self.out.
             for output in rx {
                 if output.is_err {

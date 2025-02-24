@@ -50,8 +50,8 @@ where
     /// supports colors, while lines sent to STDERR will be red if it supports
     /// colors.
     pub fn new(dir: P, out: O, err: E, color: bool) -> Self {
-        let out_color = color && color::on(color::Stream::Other(&out)).is_some();
-        let err_color = color && color::on(color::Stream::Other(&err)).is_some();
+        let out_color = color && color::on(&out).is_some();
+        let err_color = color && color::on(&err).is_some();
         Self {
             dir,
             out,

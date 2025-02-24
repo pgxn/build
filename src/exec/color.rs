@@ -12,15 +12,6 @@
 use std::env;
 use std::io::IsTerminal;
 
-/// possible stream sources
-#[derive(Clone, Copy, Debug)]
-#[allow(dead_code)]
-pub(crate) enum Stream<'a, T: IsTerminal> {
-    Stdout,
-    Stderr,
-    Other(&'a T),
-}
-
 fn env_force_color() -> usize {
     if let Ok(force) = env::var("FORCE_COLOR") {
         match force.as_ref() {
@@ -67,22 +58,13 @@ fn translate_level(level: usize) -> Option<ColorLevel> {
     }
 }
 
-fn is_a_tty<T: IsTerminal>(stream: Stream<T>) -> bool {
-    use std::io::IsTerminal;
-    match stream {
-        Stream::Stdout => std::io::stdout().is_terminal(),
-        Stream::Stderr => std::io::stderr().is_terminal(),
-        Stream::Other(o) => o.is_terminal(),
-    }
-}
-
-fn supports_color<T: IsTerminal>(stream: Stream<T>) -> usize {
+fn supports_color(stream: &impl IsTerminal) -> usize {
     let force_color = env_force_color();
     if force_color > 0 {
         force_color
     } else if env_no_color()
         || as_str(&env::var("TERM")) == Ok("dumb")
-        || !(is_a_tty(stream) || env::var("IGNORE_IS_TERMINAL").map_or(false, |v| v != "0"))
+        || !(stream.is_terminal() || env::var("IGNORE_IS_TERMINAL").map_or(false, |v| v != "0"))
     {
         0
     } else if env::var("COLORTERM").map(|colorterm| check_colorterm_16m(&colorterm)) == Ok(true)
@@ -143,7 +125,7 @@ fn check_256_color(term: &str) -> bool {
 /**
 Returns a [ColorLevel] if a [Stream] supports terminal colors.
 */
-pub(crate) fn on<T: IsTerminal>(stream: Stream<T>) -> Option<ColorLevel> {
+pub(crate) fn on(stream: &impl IsTerminal) -> Option<ColorLevel> {
     translate_level(supports_color(stream))
 }
 
@@ -161,4 +143,61 @@ pub(crate) struct ColorLevel {
     pub has_256: bool,
     /// 16 million (RGB) colors are supported.
     pub has_16m: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{io, sync::Mutex};
+
+    // needed to prevent race conditions when mutating the environment
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    fn set_up() {
+        // clears process env variable
+        env::vars().for_each(|(k, _v)| env::remove_var(k));
+    }
+
+    #[test]
+    fn test_empty_env() {
+        let _test_guard = TEST_LOCK.lock().unwrap();
+        set_up();
+
+        assert_eq!(on(&io::stdout()), None);
+    }
+
+    #[test]
+    fn test_clicolor_ansi() {
+        let _test_guard = TEST_LOCK.lock().unwrap();
+        set_up();
+
+        env::set_var("IGNORE_IS_TERMINAL", "1");
+        env::set_var("CLICOLOR", "1");
+        let expected = Some(ColorLevel {
+            level: 1,
+            has_basic: true,
+            has_256: false,
+            has_16m: false,
+        });
+        assert_eq!(on(&io::stdout()), expected);
+
+        env::set_var("CLICOLOR", "0");
+        assert_eq!(on(&io::stdout()), None);
+    }
+
+    #[test]
+    fn test_clicolor_force_ansi() {
+        let _test_guard = TEST_LOCK.lock().unwrap();
+        set_up();
+
+        env::set_var("CLICOLOR", "0");
+        env::set_var("CLICOLOR_FORCE", "1");
+        let expected = Some(ColorLevel {
+            level: 1,
+            has_basic: true,
+            has_256: false,
+            has_16m: false,
+        });
+        assert_eq!(on(&io::stdout()), expected);
+    }
 }

@@ -4,7 +4,7 @@ use color_print::cwriteln;
 use log::debug;
 use std::{
     clone::Clone,
-    io::{self, BufRead, BufReader, Write},
+    io::{self, BufRead, BufReader, IsTerminal, Write},
     path::Path,
     process::{Command, Stdio},
     sync::mpsc,
@@ -15,8 +15,8 @@ use std::{
 pub(crate) struct Executor<P, O, E>
 where
     P: AsRef<Path>,
-    O: Write,
-    E: Write,
+    O: Write + IsTerminal,
+    E: Write + IsTerminal,
 {
     dir: P,
     out: O,
@@ -27,8 +27,8 @@ where
 impl<P, O, E> Executor<P, O, E>
 where
     P: AsRef<Path>,
-    O: Write,
-    E: Write,
+    O: Write + IsTerminal,
+    E: Write + IsTerminal,
 {
     /// Creates a new command execution context. Commands passed to
     /// [`execute`] will have their current directory set to `dir`. STDOUT

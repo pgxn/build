@@ -3,7 +3,7 @@
 use crate::{error::BuildError, exec, pg_config::PgConfig};
 use log::debug;
 use std::{
-    io::{self, Write},
+    io::{self, IsTerminal, Write},
     path::Path,
     process::Command,
 };
@@ -78,6 +78,7 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
         // Use `sudo` if the param is set.
         let mut cmd = self.maybe_sudo(program, sudo);
         cmd.args(args).current_dir(self.dir());
+        println!("OUT IS? {}", io::stdout().is_terminal());
         let mut exec = exec::Executor::new(self.dir(), io::stdout(), io::stderr(), true);
         exec.execute(cmd)
     }

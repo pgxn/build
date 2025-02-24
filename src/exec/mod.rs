@@ -11,6 +11,17 @@ use std::{
     thread,
 };
 
+// Define a structure fo capturing output.
+struct Output {
+    line: String,
+    is_err: bool,
+}
+impl Output {
+    fn new(line: String, is_err: bool) -> Self {
+        Self { line, is_err }
+    }
+}
+
 /// Command execution context.
 pub(crate) struct Executor<P, O, E>
 where
@@ -37,6 +48,7 @@ where
     /// refers to a terminal, while lines sent to STDERR will be red if it
     /// refers to a terminal.
     pub fn new(dir: P, out: O, err: E, color: bool) -> Self {
+        println!("OUT IS? {}", out.is_terminal());
         Self {
             dir,
             out,
@@ -69,12 +81,6 @@ where
             .take()
             .ok_or_else(|| BuildError::Command(format!("{:?}", cmd), "no stderr".to_string()))?;
 
-        // Define a structure fo capturing output.
-        struct Output {
-            line: String,
-            is_err: bool,
-        }
-
         // Setup a channel to send stdout and stderr lines.
         let (otx, rx) = mpsc::channel();
         let etx = otx.clone();
@@ -83,11 +89,7 @@ where
         let stdout_thread = thread::spawn(move || -> Result<(), io::Error> {
             let buf = BufReader::new(child_out);
             for line in buf.lines() {
-                otx.send(Output {
-                    line: line?,
-                    is_err: false,
-                })
-                .unwrap()
+                otx.send(Output::new(line?, false)).unwrap()
             }
             Ok(())
         });
@@ -96,11 +98,7 @@ where
         let stderr_thread = thread::spawn(move || -> Result<(), io::Error> {
             let stderr_lines = BufReader::new(child_err).lines();
             for line in stderr_lines {
-                etx.send(Output {
-                    line: line?,
-                    is_err: true,
-                })
-                .unwrap()
+                etx.send(Output::new(line?, true)).unwrap();
             }
             Ok(())
         });

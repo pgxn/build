@@ -61,27 +61,33 @@ fn translate_level(level: usize) -> Option<ColorLevel> {
 fn supports_color(stream: &impl IsTerminal) -> usize {
     let force_color = env_force_color();
     if force_color > 0 {
+        println!("force color");
         force_color
     } else if env_no_color()
         || as_str(&env::var("TERM")) == Ok("dumb")
         || !(stream.is_terminal() || env::var("IGNORE_IS_TERMINAL").map_or(false, |v| v != "0"))
     {
+        println!("no color");
         0
     } else if env::var("COLORTERM").map(|colorterm| check_colorterm_16m(&colorterm)) == Ok(true)
         || env::var("TERM").map(|term| check_term_16m(&term)) == Ok(true)
         || as_str(&env::var("TERM_PROGRAM")) == Ok("iTerm.app")
     {
+        println!("all color");
         3
     } else if as_str(&env::var("TERM_PROGRAM")) == Ok("Apple_Terminal")
         || env::var("TERM").map(|term| check_256_color(&term)) == Ok(true)
     {
+        println!("some color");
         2
     } else if env::var("COLORTERM").is_ok()
         || check_ansi_color(env::var("TERM").ok().as_deref())
         || env::var("CLICOLOR").map_or(false, |v| v != "0")
     {
+        println!("yes color");
         1
     } else {
+        println!("default no color");
         0
     }
 }

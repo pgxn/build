@@ -1,13 +1,11 @@
 //! Build Pipeline interface definition.
 
-use crate::{error::BuildError, pg_config::PgConfig};
-use color_print::cwriteln;
+use crate::{error::BuildError, exec, pg_config::PgConfig};
 use log::debug;
 use std::{
-    io::{self, BufRead, BufReader, IsTerminal, Write},
+    io::{self, Write},
     path::Path,
-    process::{Command, Stdio},
-    thread,
+    process::Command,
 };
 
 /// Defines the interface for build pipelines to configure, compile, and test
@@ -80,75 +78,8 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
         // Use `sudo` if the param is set.
         let mut cmd = self.maybe_sudo(program, sudo);
         cmd.args(args).current_dir(self.dir());
-        pipe_command(cmd, io::stdout(), io::stderr())
-    }
-}
-
-fn pipe_command<O, E>(mut cmd: Command, mut out: O, mut err: E) -> Result<(), BuildError>
-where
-    O: io::Write + IsTerminal + std::marker::Send + 'static,
-    E: io::Write + IsTerminal + std::marker::Send + 'static,
-{
-    // Create pipes from the child's stdout and stderr.
-    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
-
-    // Spawn the child process.
-    debug!(command:? = cmd; "Executing");
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| BuildError::Command(format!("{:?}", cmd), e.kind().to_string()))?;
-
-    // Grab the stdout and stderr pipes.
-    let child_out = child
-        .stdout
-        .take()
-        .ok_or_else(|| BuildError::Command(format!("{:?}", cmd), "no stdout".to_string()))?;
-    let child_err = child
-        .stderr
-        .take()
-        .ok_or_else(|| BuildError::Command(format!("{:?}", cmd), "no stderr".to_string()))?;
-
-    // Read from the pipes and write to final output in separate threads.
-    // https://stackoverflow.com/a/72831067/79202
-    let stdout_thread = thread::spawn(move || -> Result<(), io::Error> {
-        let stdout_lines = BufReader::new(child_out).lines();
-        for line in stdout_lines {
-            cwriteln!(out, "<dim><244>{}</244></dim>", line.unwrap())?;
-        }
-        Ok(())
-    });
-
-    let stderr_thread = thread::spawn(move || -> Result<(), io::Error> {
-        let stderr_lines = BufReader::new(child_err).lines();
-        for line in stderr_lines {
-            cwriteln!(err, "<red>{}</red>", line.unwrap())?;
-        }
-        Ok(())
-    });
-
-    // Wait for the child and output threads to finish.
-    let res = child.wait();
-    stdout_thread.join().unwrap()?;
-    stderr_thread.join().unwrap()?;
-
-    // Determine how the command finished.
-    match res {
-        Ok(status) => {
-            if !status.success() {
-                return Err(BuildError::Command(
-                    format!("{:?}", cmd),
-                    match status.code() {
-                        Some(code) => format!("exited with status code: {code}"),
-                        None => "process terminated by signal".to_string(),
-                    },
-                ));
-            }
-            Ok(())
-        }
-        Err(e) => Err(BuildError::Command(
-            format!("{:?}", cmd),
-            e.kind().to_string(),
-        )),
+        let mut exec = exec::Executor::new(self.dir(), io::stdout(), io::stderr(), true);
+        exec.execute(cmd)
     }
 }
 

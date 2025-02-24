@@ -12,6 +12,15 @@
 use std::env;
 use std::io::IsTerminal;
 
+/// possible stream sources
+#[derive(Clone, Copy, Debug)]
+#[allow(dead_code)]
+pub(crate) enum Stream<'a, T: IsTerminal> {
+    Stdout,
+    Stderr,
+    Other(&'a T),
+}
+
 fn env_force_color() -> usize {
     if let Ok(force) = env::var("FORCE_COLOR") {
         match force.as_ref() {
@@ -58,36 +67,40 @@ fn translate_level(level: usize) -> Option<ColorLevel> {
     }
 }
 
-fn supports_color(stream: &impl IsTerminal) -> usize {
+fn is_a_tty<T: IsTerminal>(stream: Stream<T>) -> bool {
+    use std::io::IsTerminal;
+    match stream {
+        Stream::Stdout => std::io::stdout().is_terminal(),
+        Stream::Stderr => std::io::stderr().is_terminal(),
+        Stream::Other(o) => o.is_terminal(),
+    }
+}
+
+fn supports_color<T: IsTerminal>(stream: Stream<T>) -> usize {
     let force_color = env_force_color();
     if force_color > 0 {
-        println!("force color");
         force_color
     } else if env_no_color()
         || as_str(&env::var("TERM")) == Ok("dumb")
-        || !(stream.is_terminal() || env::var("IGNORE_IS_TERMINAL").map_or(false, |v| v != "0"))
+        || !(is_a_tty(stream) || env::var("IGNORE_IS_TERMINAL").map_or(false, |v| v != "0"))
     {
-        println!("no color");
         0
     } else if env::var("COLORTERM").map(|colorterm| check_colorterm_16m(&colorterm)) == Ok(true)
         || env::var("TERM").map(|term| check_term_16m(&term)) == Ok(true)
         || as_str(&env::var("TERM_PROGRAM")) == Ok("iTerm.app")
     {
-        println!("all color");
         3
     } else if as_str(&env::var("TERM_PROGRAM")) == Ok("Apple_Terminal")
         || env::var("TERM").map(|term| check_256_color(&term)) == Ok(true)
     {
-        println!("some color");
         2
     } else if env::var("COLORTERM").is_ok()
         || check_ansi_color(env::var("TERM").ok().as_deref())
         || env::var("CLICOLOR").map_or(false, |v| v != "0")
+        || is_ci::uncached()
     {
-        println!("yes color");
         1
     } else {
-        println!("default no color");
         0
     }
 }
@@ -130,7 +143,7 @@ fn check_256_color(term: &str) -> bool {
 /**
 Returns a [ColorLevel] if a [Stream] supports terminal colors.
 */
-pub(crate) fn on(stream: &impl IsTerminal) -> Option<ColorLevel> {
+pub(crate) fn on<T: IsTerminal>(stream: Stream<T>) -> Option<ColorLevel> {
     translate_level(supports_color(stream))
 }
 
@@ -140,7 +153,7 @@ Color level support details.
 This type is returned from [on]. See documentation for its fields for more details.
 */
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
-pub struct ColorLevel {
+pub(crate) struct ColorLevel {
     level: usize,
     /// Basic ANSI colors are supported.
     pub has_basic: bool,

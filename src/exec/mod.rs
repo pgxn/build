@@ -47,12 +47,11 @@ where
     /// [`execute`] will have their current directory set to `dir`. STDOUT
     /// lines will be sent to `out` and STDERR lines will be sent to err. If
     /// `color` is true, lines sent to STDOUT will be a dimmed grey if it
-    /// refers to a terminal, while lines sent to STDERR will be red if it
-    /// refers to a terminal.
+    /// supports colors, while lines sent to STDERR will be red if it supports
+    /// colors.
     pub fn new(dir: P, out: O, err: E, color: bool) -> Self {
-        let out_color = color || color::on(&out).is_some();
-        let err_color = color || color::on(&err).is_some();
-        println!("OUT IS? {}", out_color);
+        let out_color = color && color::on(color::Stream::Other(&out)).is_some();
+        let err_color = color && color::on(color::Stream::Other(&err)).is_some();
         Self {
             dir,
             out,

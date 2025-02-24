@@ -106,9 +106,17 @@ where
         });
 
         // Read the lines from the spawned threads and format them as appropriate.
-        if self.color {
-            // color_print does not omit the colors if the buffer is not
-            // attached to a terminal.
+        if !self.color || (!self.out.is_terminal() && !self.err.is_terminal()) {
+            // No color wanted or allowed. Just write the unmodified output.
+            for output in rx {
+                if output.is_err {
+                    writeln!(self.err, "{}", output.line)?;
+                } else {
+                    writeln!(self.out, "{}", output.line)?;
+                }
+            }
+        } else if self.out.is_terminal() && self.err.is_terminal() {
+            // Write colored output to both outputs.
             for output in rx {
                 if output.is_err {
                     cwriteln!(self.err, "<red>{}</red>", output.line)?;
@@ -116,11 +124,20 @@ where
                     cwriteln!(self.out, "<dim><244>{}</244></dim>", output.line)?;
                 }
             }
-        } else {
-            // No colors wanted, just write the unmodified output.
+        } else if self.out.is_terminal() {
+            // Write colored output only to self.out.
             for output in rx {
                 if output.is_err {
                     writeln!(self.err, "{}", output.line)?;
+                } else {
+                    cwriteln!(self.out, "<dim><244>{}</244></dim>", output.line)?;
+                }
+            }
+        } else {
+            // Write colored output only to self.err.
+            for output in rx {
+                if output.is_err {
+                    cwriteln!(self.err, "<red>{}</red>", output.line)?;
                 } else {
                     writeln!(self.out, "{}", output.line)?;
                 }

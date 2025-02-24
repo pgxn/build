@@ -52,6 +52,7 @@ where
     pub fn new(dir: P, out: O, err: E, color: bool) -> Self {
         let out_color = color || color::on(&out).is_some();
         let err_color = color || color::on(&err).is_some();
+        println!("OUT IS? {}", out_color);
         Self {
             dir,
             out,

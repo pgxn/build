@@ -76,13 +76,13 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
         let mut cmd = self.maybe_sudo(program, sudo);
         cmd.args(args).current_dir(self.dir());
         let mut stdout = StandardStream::stdout(ColorChoice::Auto);
-        stdout.set_color(ColorSpec::new().set_fg(Some(Color::Red)))?;
-        let mut stderr = StandardStream::stderr(ColorChoice::Auto);
-        stderr.set_color(
+        stdout.set_color(
             ColorSpec::new()
                 .set_fg(Some(Color::Ansi256(244)))
                 .set_dimmed(true),
         )?;
+        let mut stderr = StandardStream::stderr(ColorChoice::Auto);
+        stderr.set_color(ColorSpec::new().set_fg(Some(Color::Red)))?;
         let mut exec = exec::Executor::new(self.dir(), &mut stdout, &mut stderr);
         let ret = exec.execute(cmd);
         stdout.reset()?;

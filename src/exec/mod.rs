@@ -1,11 +1,9 @@
-//! Command execution context.
+//! Stream STDOUT and STDERR output from a Command to buffers.
 use crate::error::BuildError;
-mod color;
-use color_print::cwriteln;
 use log::debug;
 use std::{
     clone::Clone,
-    io::{self, BufRead, BufReader, IsTerminal, Write},
+    io::{self, BufRead, BufReader, Write},
     path::Path,
     process::{Command, Stdio},
     sync::mpsc,
@@ -17,6 +15,7 @@ struct Output {
     line: String,
     is_err: bool,
 }
+
 impl Output {
     fn new(line: String, is_err: bool) -> Self {
         Self { line, is_err }
@@ -24,41 +23,28 @@ impl Output {
 }
 
 /// Command execution context.
-pub(crate) struct Executor<P, O, E>
+pub(crate) struct Executor<'a, P, O, E>
 where
     P: AsRef<Path>,
-    O: Write + IsTerminal,
-    E: Write + IsTerminal,
+    O: Write,
+    E: Write,
 {
     dir: P,
-    out: O,
-    err: E,
-    out_color: bool,
-    err_color: bool,
+    out: &'a mut O,
+    err: &'a mut E,
 }
 
-impl<P, O, E> Executor<P, O, E>
+impl<'a, P, O, E> Executor<'a, P, O, E>
 where
     P: AsRef<Path>,
-    O: Write + IsTerminal,
-    E: Write + IsTerminal,
+    O: Write,
+    E: Write,
 {
     /// Creates a new command execution context. Commands passed to
     /// [`execute`] will have their current directory set to `dir`. STDOUT
-    /// lines will be sent to `out` and STDERR lines will be sent to err. If
-    /// `color` is true, lines sent to STDOUT will be a dimmed grey if it
-    /// supports colors, while lines sent to STDERR will be red if it supports
-    /// colors.
-    pub fn new(dir: P, out: O, err: E, color: bool) -> Self {
-        let out_color = color && color::on(&out).is_some();
-        let err_color = color && color::on(&err).is_some();
-        Self {
-            dir,
-            out,
-            err,
-            out_color,
-            err_color,
-        }
+    /// lines will be sent to `out` and STDERR lines will be sent to err.
+    pub fn new(dir: P, out: &'a mut O, err: &'a mut E) -> Self {
+        Self { dir, out, err }
     }
 
     /// Sets `cmd`'s `current_dir` to `self.dir`, pipes output to `self.out`
@@ -107,42 +93,12 @@ where
             Ok(())
         });
 
-        // Read the lines from the spawned threads and format them as appropriate.
-        if !self.out_color && !self.err_color {
-            // No color wanted or allowed. Just write the unmodified output.
-            for output in rx {
-                if output.is_err {
-                    writeln!(self.err, "{}", output.line)?;
-                } else {
-                    writeln!(self.out, "{}", output.line)?;
-                }
-            }
-        } else if self.out_color && self.err_color {
-            // Write colored output to both outputs.
-            for output in rx {
-                if output.is_err {
-                    cwriteln!(self.err, "<red>{}</red>", output.line)?;
-                } else {
-                    cwriteln!(self.out, "<dim><244>{}</244></dim>", output.line)?;
-                }
-            }
-        } else if self.out_color {
-            // Write colored output only to self.out.
-            for output in rx {
-                if output.is_err {
-                    writeln!(self.err, "{}", output.line)?;
-                } else {
-                    cwriteln!(self.out, "<dim><244>{}</244></dim>", output.line)?;
-                }
-            }
-        } else {
-            // Write colored output only to self.err.
-            for output in rx {
-                if output.is_err {
-                    cwriteln!(self.err, "<red>{}</red>", output.line)?;
-                } else {
-                    writeln!(self.out, "{}", output.line)?;
-                }
+        // Read the lines from the spawned threads and format send them to the buffers.
+        for output in rx {
+            if output.is_err {
+                writeln!(self.err, "{}", output.line)?;
+            } else {
+                writeln!(self.out, "{}", output.line)?;
             }
         }
 

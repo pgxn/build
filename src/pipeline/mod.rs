@@ -2,11 +2,8 @@
 
 use crate::{error::BuildError, exec, pg_config::PgConfig};
 use log::debug;
-use std::{
-    io::{self, Write},
-    path::Path,
-    process::Command,
-};
+use std::{io::Write, path::Path, process::Command};
+use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 /// Defines the interface for build pipelines to configure, compile, and test
 /// PGXN distributions.
@@ -78,8 +75,19 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
         // Use `sudo` if the param is set.
         let mut cmd = self.maybe_sudo(program, sudo);
         cmd.args(args).current_dir(self.dir());
-        let mut exec = exec::Executor::new(self.dir(), io::stdout(), io::stderr(), true);
-        exec.execute(cmd)
+        let mut stdout = StandardStream::stdout(ColorChoice::Auto);
+        stdout.set_color(ColorSpec::new().set_fg(Some(Color::Red)))?;
+        let mut stderr = StandardStream::stderr(ColorChoice::Auto);
+        stderr.set_color(
+            ColorSpec::new()
+                .set_fg(Some(Color::Ansi256(244)))
+                .set_dimmed(true),
+        )?;
+        let mut exec = exec::Executor::new(self.dir(), &mut stdout, &mut stderr);
+        let ret = exec.execute(cmd);
+        stdout.reset()?;
+        stderr.reset()?;
+        ret
     }
 }
 

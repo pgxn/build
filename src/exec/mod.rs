@@ -1,9 +1,10 @@
 //! Stream STDOUT and STDERR output from a Command to buffers.
 use crate::error::BuildError;
+use crate::line::WriteLine;
 use log::debug;
 use std::{
     clone::Clone,
-    io::{self, BufRead, BufReader, Write},
+    io::{self, BufRead, BufReader},
     path::Path,
     process::{Command, Stdio},
     sync::mpsc,
@@ -23,27 +24,27 @@ impl Output {
 }
 
 /// Command execution context.
-pub(crate) struct Executor<'a, P, O, E>
+pub(crate) struct Executor<P, O, E>
 where
     P: AsRef<Path>,
-    O: Write,
-    E: Write,
+    O: WriteLine,
+    E: WriteLine,
 {
     dir: P,
-    out: &'a mut O,
-    err: &'a mut E,
+    out: O,
+    err: E,
 }
 
-impl<'a, P, O, E> Executor<'a, P, O, E>
+impl<P, O, E> Executor<P, O, E>
 where
     P: AsRef<Path>,
-    O: Write,
-    E: Write,
+    O: WriteLine,
+    E: WriteLine,
 {
     /// Creates a new command execution context. Commands passed to
     /// [`execute`] will have their current directory set to `dir`. STDOUT
     /// lines will be sent to `out` and STDERR lines will be sent to err.
-    pub fn new(dir: P, out: &'a mut O, err: &'a mut E) -> Self {
+    pub fn new(dir: P, out: O, err: E) -> Self {
         Self { dir, out, err }
     }
 
@@ -96,9 +97,9 @@ where
         // Read the lines from the spawned threads and format send them to the buffers.
         for output in rx {
             if output.is_err {
-                writeln!(self.err, "{}", output.line)?;
+                self.err.write_line(&output.line)?;
             } else {
-                writeln!(self.out, "{}", output.line)?;
+                self.out.write_line(&output.line)?;
             }
         }
 

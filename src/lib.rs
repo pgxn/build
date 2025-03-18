@@ -7,16 +7,18 @@ This crate builds PGXN distributions for a variety of platforms and Postgres
 versions.
 
 */
-pub mod api;
+mod api;
 pub mod error;
 mod exec;
-pub mod pg_config;
+mod line;
+mod pg_config;
 mod pgrx;
 mod pgxs;
 mod pipeline;
 
 use crate::{error::BuildError, pgrx::Pgrx, pgxs::Pgxs, pipeline::Pipeline};
-use pg_config::PgConfig;
+pub use api::Api;
+pub use pg_config::PgConfig;
 use pgxn_meta::{dist, release::Release};
 use std::path::Path;
 

@@ -1,9 +1,11 @@
 //! Build Pipeline interface definition.
 
+use crate::line::{ColorLine, LineWriter, WriteLine};
 use crate::{error::BuildError, exec, pg_config::PgConfig};
 use log::debug;
-use std::{io::Write, path::Path, process::Command};
-use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
+use owo_colors::Style;
+use std::{io, io::Write, path::Path, process::Command};
+use supports_color::Stream;
 
 /// Defines the interface for build pipelines to configure, compile, and test
 /// PGXN distributions.
@@ -34,6 +36,24 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
 
     /// Returns the PgConfig passed to [`new`].
     fn pg_config(&self) -> &PgConfig;
+
+    /// Returns the io::Write object to which STDOUT from commands will be
+    /// streamed.
+    fn stdout(&self) -> Box<dyn WriteLine> {
+        if supports_color::on(Stream::Stdout).is_some() {
+            return Box::new(ColorLine::new(io::stdout(), Style::new().white().dimmed()));
+        }
+        Box::new(LineWriter::new(io::stdout()))
+    }
+
+    /// Returns the io::Write object to which STDERR from commands will be
+    /// streamed.
+    fn stderr(&self) -> Box<dyn WriteLine> {
+        if supports_color::on(Stream::Stdout).is_some() {
+            return Box::new(ColorLine::new(io::stderr(), Style::new().red()));
+        }
+        Box::new(LineWriter::new(io::stderr()))
+    }
 
     // maybe_sudo returns a Command that starts with the sudo command if
     // `sudo` is true and the `pkglibdir` returned by pg_config isn't
@@ -75,19 +95,10 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
         // Use `sudo` if the param is set.
         let mut cmd = self.maybe_sudo(program, sudo);
         cmd.args(args).current_dir(self.dir());
-        let mut stdout = StandardStream::stdout(ColorChoice::Auto);
-        stdout.set_color(
-            ColorSpec::new()
-                .set_fg(Some(Color::Ansi256(244)))
-                .set_dimmed(true),
-        )?;
-        let mut stderr = StandardStream::stderr(ColorChoice::Auto);
-        stderr.set_color(ColorSpec::new().set_fg(Some(Color::Red)))?;
-        let mut exec = exec::Executor::new(self.dir(), &mut stdout, &mut stderr);
-        let ret = exec.execute(cmd);
-        stdout.reset()?;
-        stderr.reset()?;
-        ret
+
+        // Execute the command.
+        let mut exec = exec::Executor::new(self.dir(), self.stdout(), self.stderr());
+        exec.execute(cmd)
     }
 }
 

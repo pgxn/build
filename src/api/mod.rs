@@ -4,7 +4,7 @@ Interface to local and remote PGXN mirrors and the PGXN API.
 
 */
 mod dist;
-pub use dist::{Dist, Release, Releases};
+pub use dist::Dist;
 
 use crate::error::BuildError;
 use iri_string::spec;

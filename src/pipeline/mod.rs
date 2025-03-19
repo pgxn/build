@@ -1,6 +1,6 @@
 //! Build Pipeline interface definition.
 
-use crate::line::{ColorLine, LineWriter, WriteLine};
+use crate::line::{ColorLine, LineWriter};
 use crate::{error::BuildError, exec, pg_config::PgConfig};
 use log::debug;
 use owo_colors::Style;
@@ -37,22 +37,22 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
     /// Returns the PgConfig passed to [`new`].
     fn pg_config(&self) -> &PgConfig;
 
-    /// Returns the io::Write object to which STDOUT from commands will be
+    /// Returns the WriteLine object to which STDOUT from commands will be
     /// streamed.
-    fn stdout(&self) -> Box<dyn WriteLine> {
+    fn stdout(&self) -> Box<dyn Write> {
         if supports_color::on(Stream::Stdout).is_some() {
             return Box::new(ColorLine::new(io::stdout(), Style::new().white().dimmed()));
         }
-        Box::new(LineWriter::new(io::stdout()))
+        Box::new(io::stdout())
     }
 
-    /// Returns the io::Write object to which STDERR from commands will be
+    /// Returns the WriteLine object to which STDERR from commands will be
     /// streamed.
-    fn stderr(&self) -> Box<dyn WriteLine> {
+    fn stderr(&self) -> Box<dyn Write> {
         if supports_color::on(Stream::Stdout).is_some() {
             return Box::new(ColorLine::new(io::stderr(), Style::new().red()));
         }
-        Box::new(LineWriter::new(io::stderr()))
+        Box::new(io::stderr())
     }
 
     // maybe_sudo returns a Command that starts with the sudo command if
@@ -96,8 +96,14 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
         let mut cmd = self.maybe_sudo(program, sudo);
         cmd.args(args).current_dir(self.dir());
 
+        // Collect the output buffers.
+        let mut stdout = self.stdout();
+        let mut stderr = self.stderr();
+        let line_out = LineWriter::new(&mut stdout);
+        let line_err = LineWriter::new(&mut stderr);
+
         // Execute the command.
-        let mut exec = exec::Executor::new(self.dir(), self.stdout(), self.stderr());
+        let mut exec = exec::Executor::new(self.dir(), line_out, line_err);
         exec.execute(cmd)
     }
 }

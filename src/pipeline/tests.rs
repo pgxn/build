@@ -7,13 +7,20 @@ use tempfile::tempdir;
 struct TestPipeline<P: AsRef<Path>> {
     dir: P,
     cfg: PgConfig,
+    // out: Vec<u8>,
+    // err: Vec<u8>,
 }
 
 // Create a mock version of the trait.
 #[cfg(test)]
 impl<P: AsRef<Path>> Pipeline<P> for TestPipeline<P> {
     fn new(dir: P, cfg: PgConfig) -> Self {
-        TestPipeline { dir, cfg }
+        TestPipeline {
+            dir,
+            cfg,
+            // out: Vec::new(),
+            // err: Vec::new(),
+        }
     }
 
     fn dir(&self) -> &P {
@@ -39,6 +46,13 @@ impl<P: AsRef<Path>> Pipeline<P> for TestPipeline<P> {
     fn test(&self) -> Result<(), BuildError> {
         Ok(())
     }
+
+    // fn stdout(&self) -> Box<dyn Write> {
+    //     Box::new(self.out)
+    // }
+    // fn stderr(&mut self) -> Box<dyn Write> {
+    //     Box::new(&mut self.err)
+    // }
 }
 
 #[test]

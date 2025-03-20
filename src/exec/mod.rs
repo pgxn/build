@@ -4,6 +4,7 @@ use crate::line::WriteLine;
 use log::debug;
 use std::{
     clone::Clone,
+    fmt,
     io::{self, BufRead, BufReader},
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -27,30 +28,43 @@ impl Output {
 }
 
 /// Command execution context.
-#[derive(Debug, PartialEq)]
-pub(crate) struct Executor<O, E>
-where
-    O: WriteLine,
-    E: WriteLine,
-{
+// #[derive(Debug, PartialEq)]
+pub(crate) struct Executor {
     dir: PathBuf,
-    out: O,
-    err: E,
+    out: Box<dyn WriteLine>,
+    err: Box<dyn WriteLine>,
 }
 
-impl<O, E> Executor<O, E>
-where
-    O: WriteLine,
-    E: WriteLine,
-{
+impl fmt::Debug for Executor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Executor")
+            .field("dir", &self.dir)
+            .field("out", &std::any::type_name_of_val(&self.out))
+            .field("err", &std::any::type_name_of_val(&self.err))
+            .finish()
+    }
+}
+
+/// Consider Executors equal if they have the same directory
+impl PartialEq for Executor {
+    fn eq(&self, other: &Self) -> bool {
+        self.dir() == other.dir()
+    }
+}
+
+impl Executor {
     /// Creates a new command execution context. Commands passed to
     /// [`execute`] will have their current directory set to `dir`. STDOUT
     /// lines will be sent to `out` and STDERR lines will be sent to err.
-    pub fn new(dir: impl Into<PathBuf>, out: O, err: E) -> Self {
+    pub fn new<O: WriteLine + 'static, E: WriteLine + 'static>(
+        dir: impl Into<PathBuf>,
+        out: O,
+        err: E,
+    ) -> Self {
         Self {
             dir: dir.into(),
-            out,
-            err,
+            out: Box::new(out),
+            err: Box::new(err),
         }
     }
 

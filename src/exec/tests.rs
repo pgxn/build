@@ -28,10 +28,8 @@ fn execute() -> Result<(), BuildError> {
     compile_mock("emit", &dest);
 
     // Set up buffers for output.
-    let mut out = Vec::new();
-    let mut err = Vec::new();
-    let stdout = line::LineWriter::new(&mut out);
-    let stderr = line::LineWriter::new(&mut err);
+    let stdout = line::LineWriter::new(Vec::<u8>::new());
+    let stderr = line::LineWriter::new(Vec::<u8>::new());
     let mut exec = Executor::new(tmp.as_ref(), stdout, stderr);
 
     // Run the app.
@@ -56,10 +54,10 @@ fn execute() -> Result<(), BuildError> {
     assert_eq!("this is error output\nmore error output\n", res);
 
     // Test nonexistent file.
-    let mut out = Vec::new();
-    let mut err = Vec::new();
-    let stdout = line::LineWriter::new(&mut out);
-    let stderr = line::LineWriter::new(&mut err);
+    let out = Vec::new();
+    let err = Vec::new();
+    let stdout = line::LineWriter::new(out);
+    let stderr = line::LineWriter::new(err);
     let mut exec = Executor::new(tmp.as_ref(), stdout, stderr);
     match exec.execute(Command::new("__nonesuch_nope__")) {
         Ok(_) => panic!("Nonexistent file unexpectedly succeeded"),

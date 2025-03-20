@@ -2,28 +2,37 @@
 //!
 //! [pgrx]: https://github.com/pgcentralfoundation/pgrx
 
-use crate::error::BuildError;
-use crate::pg_config::PgConfig;
 use crate::pipeline::Pipeline;
+use crate::{error::BuildError, exec::Executor, line::WriteLine, pg_config::PgConfig};
 use std::path::Path;
 
 /// Builder implementation for [pgrx] Pipelines.
 ///
 /// [pgrx]: https://github.com/pgcentralfoundation/pgrx
 #[derive(Debug, PartialEq)]
-pub(crate) struct Pgrx<P: AsRef<Path>> {
+pub(crate) struct Pgrx<P, O, E>
+where
+    P: AsRef<Path>,
+    O: WriteLine,
+    E: WriteLine,
+{
+    exec: Executor<P, O, E>,
     cfg: PgConfig,
-    dir: P,
 }
 
-impl<P: AsRef<Path>> Pipeline<P> for Pgrx<P> {
-    fn new(dir: P, cfg: PgConfig) -> Self {
-        Pgrx { cfg, dir }
+impl<P, O, E> Pipeline<P, O, E> for Pgrx<P, O, E>
+where
+    P: AsRef<Path>,
+    O: WriteLine,
+    E: WriteLine,
+{
+    fn new(exec: Executor<P, O, E>, cfg: PgConfig) -> Self {
+        Pgrx { exec, cfg }
     }
 
-    /// Returns the directory passed to [`Self::new`].
-    fn dir(&self) -> &P {
-        &self.dir
+    /// Returns the Executor passed to [`Self::new`].
+    fn executor(&mut self) -> &mut Executor<P, O, E> {
+        &mut self.exec
     }
 
     /// Returns the PgConfig passed to [`Self::new`].
@@ -54,22 +63,22 @@ impl<P: AsRef<Path>> Pipeline<P> for Pgrx<P> {
     }
 
     /// Runs `cargo init`.
-    fn configure(&self) -> Result<(), BuildError> {
+    fn configure(&mut self) -> Result<(), BuildError> {
         Ok(())
     }
 
     /// Runs `cargo build`.
-    fn compile(&self) -> Result<(), BuildError> {
+    fn compile(&mut self) -> Result<(), BuildError> {
         Ok(())
     }
 
     /// Runs `cargo test`.
-    fn test(&self) -> Result<(), BuildError> {
+    fn test(&mut self) -> Result<(), BuildError> {
         Ok(())
     }
 
     /// Runs `cargo install`.
-    fn install(&self) -> Result<(), BuildError> {
+    fn install(&mut self) -> Result<(), BuildError> {
         Ok(())
     }
 }

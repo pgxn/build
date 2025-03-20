@@ -2,8 +2,9 @@
 //!
 //! [PGXS]: https://www.postgresql.org/docs/current/extend-pgxs.html
 
-use crate::pipeline::Pipeline;
-use crate::{error::BuildError, pg_config::PgConfig};
+use crate::{
+    error::BuildError, exec::Executor, line::WriteLine, pg_config::PgConfig, pipeline::Pipeline,
+};
 use log::{debug, info};
 use regex::Regex;
 use std::{
@@ -16,14 +17,24 @@ use std::{
 ///
 /// [PGXS]: https://www.postgresql.org/docs/current/extend-pgxs.html
 #[derive(Debug, PartialEq)]
-pub(crate) struct Pgxs<P: AsRef<Path>> {
+pub(crate) struct Pgxs<P, O, E>
+where
+    P: AsRef<Path>,
+    O: WriteLine,
+    E: WriteLine,
+{
+    exec: Executor<P, O, E>,
     cfg: PgConfig,
-    dir: P,
 }
 
-impl<P: AsRef<Path>> Pipeline<P> for Pgxs<P> {
-    fn new(dir: P, cfg: PgConfig) -> Self {
-        Pgxs { cfg, dir }
+impl<P, O, E> Pipeline<P, O, E> for Pgxs<P, O, E>
+where
+    P: AsRef<Path>,
+    O: WriteLine,
+    E: WriteLine,
+{
+    fn new(exec: Executor<P, O, E>, cfg: PgConfig) -> Self {
+        Pgxs { exec, cfg }
     }
 
     /// Determines the confidence that the Pgxs pipeline can build the
@@ -65,9 +76,9 @@ impl<P: AsRef<Path>> Pipeline<P> for Pgxs<P> {
         score
     }
 
-    /// Returns the directory passed to [`Self::new`].
-    fn dir(&self) -> &P {
-        &self.dir
+    /// Returns the Executor passed to [`Self::new`].
+    fn executor(&mut self) -> &mut Executor<P, O, E> {
+        &mut self.exec
     }
 
     /// Returns the PgConfig passed to [`Self::new`].
@@ -75,9 +86,9 @@ impl<P: AsRef<Path>> Pipeline<P> for Pgxs<P> {
         &self.cfg
     }
 
-    fn configure(&self) -> Result<(), BuildError> {
+    fn configure(&mut self) -> Result<(), BuildError> {
         // Run configure if it exists.
-        if let Ok(ok) = fs::exists(self.dir().as_ref().join("configure")) {
+        if let Ok(ok) = fs::exists(self.exec.dir().as_ref().join("configure")) {
             if ok {
                 info!("running configure");
                 // "." will not work on VMS or MacOS Classic.
@@ -89,19 +100,19 @@ impl<P: AsRef<Path>> Pipeline<P> for Pgxs<P> {
         Ok(())
     }
 
-    fn compile(&self) -> Result<(), BuildError> {
+    fn compile(&mut self) -> Result<(), BuildError> {
         info!("building extension");
         self.run("make", ["all"], false)?;
         Ok(())
     }
 
-    fn test(&self) -> Result<(), BuildError> {
+    fn test(&mut self) -> Result<(), BuildError> {
         info!("testing extension");
         self.run("make", ["installcheck"], false)?;
         Ok(())
     }
 
-    fn install(&self) -> Result<(), BuildError> {
+    fn install(&mut self) -> Result<(), BuildError> {
         info!("installing extension");
         self.run("make", ["install"], true)?;
         Ok(())

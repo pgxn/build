@@ -27,6 +27,7 @@ impl Output {
 }
 
 /// Command execution context.
+#[derive(Debug, PartialEq)]
 pub(crate) struct Executor<P, O, E>
 where
     P: AsRef<Path>,
@@ -49,6 +50,11 @@ where
     /// lines will be sent to `out` and STDERR lines will be sent to err.
     pub fn new(dir: P, out: O, err: E) -> Self {
         Self { dir, out, err }
+    }
+
+    /// Returns the directory passed to [`Self::new`].
+    pub fn dir(&self) -> &P {
+        &self.dir
     }
 
     /// Sets `cmd`'s `current_dir` to `self.dir`, pipes output to `self.out`

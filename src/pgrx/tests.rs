@@ -1,10 +1,16 @@
 use super::*;
+use crate::line::LineWriter;
 use std::{collections::HashMap, fs::File, io::Write};
 use tempfile::tempdir;
 
 #[test]
 fn confidence() -> Result<(), BuildError> {
     let tmp = tempdir()?;
+    // let mut out = Vec::new();
+    // let mut err = Vec::new();
+    // // Test basic success.
+    // let exec = Executor::new(&tmp, LineWriter::new(&mut out), LineWriter::new(&mut err));
+
     // No Cargo.toml.
     assert_eq!(0, Pgrx::confidence(tmp.as_ref()));
 

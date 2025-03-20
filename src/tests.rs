@@ -1,7 +1,46 @@
 use super::*;
+use bytes::{BufMut, BytesMut};
 use serde_json::{json, Value};
-use std::{collections::HashMap, fs::File, io::Write, path::PathBuf, process::Command};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{self, Cursor, Write},
+    path::PathBuf,
+    process::Command,
+    sync::{Arc, Mutex},
+};
 use tempfile::tempdir;
+
+struct BufferWriter {
+    buffer: BytesMut,
+}
+
+impl Write for BufferWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.buffer.put(buf);
+
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+pub fn test_writer() -> (Writer, BytesMut, BytesMut) {
+    let out_buffer = BytesMut::new();
+    let err_buffer = BytesMut::new();
+
+    let stdout_writer = BufferWriter {
+        buffer: out_buffer.clone(),
+    };
+    let stderr_writer = BufferWriter {
+        buffer: err_buffer.clone(),
+    };
+
+    let writer = Writer::new(stdout_writer, stderr_writer);
+    (writer, out_buffer, err_buffer)
+}
 
 fn release_meta(pipeline: &str) -> Value {
     json!({
@@ -63,10 +102,14 @@ fn pgrx() {
     let tmp = tempdir().unwrap();
     let cfg = PgConfig::from_map(HashMap::new());
     let rel = Release::try_from(meta.clone()).unwrap();
-    let builder = Builder::new(tmp.as_ref(), rel, cfg.clone()).unwrap();
+
+    let (writer, stdout, stderr) = test_writer();
+
+    let builder = Builder::new(writer, tmp.as_ref(), rel, cfg.clone()).unwrap();
     let rel = Release::try_from(meta).unwrap();
+
     let exp = Builder {
-        pipeline: Build::Pgrx(Pgrx::new(tmp.as_ref(), cfg.clone())),
+        pipeline: Build::Pgrx(Pgrx::new(writer, tmp.as_ref(), cfg.clone())),
         meta: rel,
     };
     assert_eq!(exp, builder, "pgrx");

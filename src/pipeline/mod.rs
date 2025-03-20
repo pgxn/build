@@ -1,14 +1,18 @@
 //! Build Pipeline interface definition.
 
-use crate::{error::BuildError, pg_config::PgConfig};
+use crate::{error::BuildError, pg_config::PgConfig, writer::Writer};
 use log::debug;
-use std::{io::Write, path::Path, process::Command};
+use std::{
+    io::{self, Write},
+    path::Path,
+    process::Command,
+};
 
 /// Defines the interface for build pipelines to configure, compile, and test
 /// PGXN distributions.
 pub(crate) trait Pipeline {
     /// Creates an instance of a Pipeline.
-    fn new(dir: impl AsRef<Path>, pg_config: PgConfig) -> Self;
+    fn new(writer: Writer, dir: impl AsRef<Path>, pg_config: PgConfig) -> Self;
 
     /// Returns a score for the confidence that this pipeline can build the
     /// contents of `dir`. A score of 0 means no confidence and 255 means the

@@ -3,9 +3,11 @@
 //! [PGXS]: https://www.postgresql.org/docs/current/extend-pgxs.html
 
 use crate::pipeline::Pipeline;
+use crate::writer::Writer;
 use crate::{error::BuildError, pg_config::PgConfig};
 use log::info;
 use regex::Regex;
+use std::io;
 use std::{
     fs::{self, File},
     io::{BufRead, BufReader},
@@ -19,13 +21,15 @@ use std::{
 pub(crate) struct Pgxs {
     cfg: PgConfig,
     dir: PathBuf,
+    writer: Writer,
 }
 
 impl Pipeline for Pgxs {
-    fn new(dir: impl AsRef<Path>, cfg: PgConfig) -> Self {
+    fn new(writer: Writer, dir: impl AsRef<Path>, cfg: PgConfig) -> Self {
         Pgxs {
             cfg,
             dir: dir.as_ref().to_path_buf(),
+            writer,
         }
     }
 

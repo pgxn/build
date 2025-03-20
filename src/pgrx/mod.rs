@@ -2,10 +2,13 @@
 //!
 //! [pgrx]: https://github.com/pgcentralfoundation/pgrx
 
-use crate::error::BuildError;
 use crate::pg_config::PgConfig;
 use crate::pipeline::Pipeline;
-use std::path::{Path, PathBuf};
+use crate::{error::BuildError, writer::Writer};
+use std::{
+    io,
+    path::{Path, PathBuf},
+};
 
 /// Builder implementation for [pgrx] Pipelines.
 ///
@@ -14,13 +17,15 @@ use std::path::{Path, PathBuf};
 pub(crate) struct Pgrx {
     cfg: PgConfig,
     dir: PathBuf,
+    writer: Writer,
 }
 
 impl Pipeline for Pgrx {
-    fn new(dir: impl AsRef<Path>, cfg: PgConfig) -> Self {
+    fn new(writer: Writer, dir: impl AsRef<Path>, cfg: PgConfig) -> Self {
         Pgrx {
             cfg,
             dir: dir.as_ref().to_path_buf(),
+            writer,
         }
     }
 

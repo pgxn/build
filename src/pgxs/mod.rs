@@ -16,14 +16,17 @@ use std::{
 ///
 /// [PGXS]: https://www.postgresql.org/docs/current/extend-pgxs.html
 #[derive(Debug, PartialEq)]
-pub(crate) struct Pgxs<P: AsRef<Path>> {
+pub(crate) struct Pgxs {
     cfg: PgConfig,
-    dir: P,
+    dir: PathBuf,
 }
 
-impl<P: AsRef<Path>> Pipeline<P> for Pgxs<P> {
-    fn new(dir: P, cfg: PgConfig) -> Self {
-        Pgxs { cfg, dir }
+impl Pipeline for Pgxs {
+    fn new(dir: impl AsRef<Path>, cfg: PgConfig) -> Self {
+        Pgxs {
+            cfg,
+            dir: dir.as_ref().to_path_buf(),
+        }
     }
 
     /// Determines the confidence that the Pgxs pipeline can build the
@@ -34,7 +37,7 @@ impl<P: AsRef<Path>> Pipeline<P> for Pgxs<P> {
     /// *   Returns 200 if it declares variables named `MODULES`,
     ///     `MODULE_big`, `PROGRAM`, `EXTENSION`, `DATA`, or `DATA_built`
     /// *   Otherwise returns 127
-    fn confidence(dir: P) -> u8 {
+    fn confidence(dir: impl AsRef<Path>) -> u8 {
         let file = match makefile(dir.as_ref()) {
             Some(f) => f,
             None => return 0,
@@ -66,7 +69,7 @@ impl<P: AsRef<Path>> Pipeline<P> for Pgxs<P> {
     }
 
     /// Returns the directory passed to [`Self::new`].
-    fn dir(&self) -> &P {
+    fn dir(&self) -> impl AsRef<Path> {
         &self.dir
     }
 

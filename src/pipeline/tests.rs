@@ -1,22 +1,25 @@
 use super::*;
 use crate::tests::compile_mock;
 use assertables::*;
-use std::{collections::HashMap, env};
+use std::{collections::HashMap, env, path::PathBuf};
 use tempfile::tempdir;
 
-struct TestPipeline<P: AsRef<Path>> {
-    dir: P,
+struct TestPipeline {
+    dir: PathBuf,
     cfg: PgConfig,
 }
 
 // Create a mock version of the trait.
 #[cfg(test)]
-impl<P: AsRef<Path>> Pipeline<P> for TestPipeline<P> {
-    fn new(dir: P, cfg: PgConfig) -> Self {
-        TestPipeline { dir, cfg }
+impl Pipeline for TestPipeline {
+    fn new(dir: impl AsRef<Path>, cfg: PgConfig) -> Self {
+        TestPipeline {
+            dir: dir.as_ref().to_path_buf(),
+            cfg,
+        }
     }
 
-    fn dir(&self) -> &P {
+    fn dir(&self) -> impl AsRef<Path> {
         &self.dir
     }
 
@@ -24,9 +27,10 @@ impl<P: AsRef<Path>> Pipeline<P> for TestPipeline<P> {
         &self.cfg
     }
 
-    fn confidence(_: P) -> u8 {
+    fn confidence(_: impl AsRef<Path>) -> u8 {
         0
     }
+
     fn configure(&self) -> Result<(), BuildError> {
         Ok(())
     }
@@ -133,7 +137,7 @@ fn maybe_sudo() -> Result<(), BuildError> {
         "pkglibdir".to_string(),
         tmp.path().join("nonesuch").display().to_string(),
     )]));
-    let pipe = TestPipeline::new(&tmp, cfg);
+    let pipe = TestPipeline::new(tmp, cfg);
     let cmd = pipe.maybe_sudo("foo", true);
     assert_eq!("sudo", cmd.get_program().to_str().unwrap());
     let args: Vec<&std::ffi::OsStr> = cmd.get_args().collect();

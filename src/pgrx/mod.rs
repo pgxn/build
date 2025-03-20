@@ -5,24 +5,27 @@
 use crate::error::BuildError;
 use crate::pg_config::PgConfig;
 use crate::pipeline::Pipeline;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Builder implementation for [pgrx] Pipelines.
 ///
 /// [pgrx]: https://github.com/pgcentralfoundation/pgrx
 #[derive(Debug, PartialEq)]
-pub(crate) struct Pgrx<P: AsRef<Path>> {
+pub(crate) struct Pgrx {
     cfg: PgConfig,
-    dir: P,
+    dir: PathBuf,
 }
 
-impl<P: AsRef<Path>> Pipeline<P> for Pgrx<P> {
-    fn new(dir: P, cfg: PgConfig) -> Self {
-        Pgrx { cfg, dir }
+impl Pipeline for Pgrx {
+    fn new(dir: impl AsRef<Path>, cfg: PgConfig) -> Self {
+        Pgrx {
+            cfg,
+            dir: dir.as_ref().to_path_buf(),
+        }
     }
 
     /// Returns the directory passed to [`Self::new`].
-    fn dir(&self) -> &P {
+    fn dir(&self) -> impl AsRef<Path> {
         &self.dir
     }
 
@@ -35,7 +38,7 @@ impl<P: AsRef<Path>> Pipeline<P> for Pgrx<P> {
     /// contents of `dir`. Returns 255 if it contains a file named
     /// `Cargo.toml` and lists pgrx as a dependency. Otherwise returns 1 if
     /// `Cargo.toml` exists and 0 if it does not.
-    fn confidence(dir: P) -> u8 {
+    fn confidence(dir: impl AsRef<Path>) -> u8 {
         let file = dir.as_ref().join("Cargo.toml");
         if !file.exists() {
             return 0;

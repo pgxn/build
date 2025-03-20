@@ -59,14 +59,14 @@ fn new() {
     let cfg = PgConfig::from_map(HashMap::new());
     let pipe = Pgxs::new(dir, cfg.clone());
     assert_eq!(dir, pipe.dir);
-    assert_eq!(&dir, pipe.dir());
+    assert_eq!(dir, pipe.dir().as_ref());
     assert_eq!(&cfg, pipe.pg_config());
 
     let dir2 = dir.join("corpus");
     let cfg2 = PgConfig::from_map(HashMap::from([("bindir".to_string(), "bin".to_string())]));
     let pipe = Pgxs::new(dir2.as_path(), cfg2.clone());
     assert_eq!(dir2, pipe.dir);
-    assert_eq!(&dir2, pipe.dir());
+    assert_eq!(&dir2, pipe.dir().as_ref());
     assert_eq!(&cfg2, pipe.pg_config());
 }
 

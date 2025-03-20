@@ -6,14 +6,14 @@ use std::{io::Write, path::Path, process::Command};
 
 /// Defines the interface for build pipelines to configure, compile, and test
 /// PGXN distributions.
-pub(crate) trait Pipeline<P: AsRef<Path>> {
+pub(crate) trait Pipeline {
     /// Creates an instance of a Pipeline.
-    fn new(dir: P, pg_config: PgConfig) -> Self;
+    fn new(dir: impl AsRef<Path>, pg_config: PgConfig) -> Self;
 
     /// Returns a score for the confidence that this pipeline can build the
     /// contents of `dir`. A score of 0 means no confidence and 255 means the
     /// highest confidence.
-    fn confidence(dir: P) -> u8;
+    fn confidence(dir: impl AsRef<Path>) -> u8;
 
     /// Configures a distribution to build on a particular platform and
     /// Postgres version.
@@ -29,7 +29,7 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
     fn test(&self) -> Result<(), BuildError>;
 
     /// Returns the directory passed to [`new`].
-    fn dir(&self) -> &P;
+    fn dir(&self) -> impl AsRef<Path>;
 
     /// Returns the PgConfig passed to [`new`].
     fn pg_config(&self) -> &PgConfig;

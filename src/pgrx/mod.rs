@@ -9,27 +9,19 @@ use std::path::Path;
 /// Builder implementation for [pgrx] Pipelines.
 ///
 /// [pgrx]: https://github.com/pgcentralfoundation/pgrx
-#[derive(PartialEq)]
-pub(crate) struct Pgrx<O, E>
-where
-    O: WriteLine,
-    E: WriteLine,
-{
-    exec: Executor<O, E>,
+#[derive(PartialEq, Debug)]
+pub(crate) struct Pgrx {
+    exec: Executor,
     cfg: PgConfig,
 }
 
-impl<O, E> Pipeline<O, E> for Pgrx<O, E>
-where
-    O: WriteLine,
-    E: WriteLine,
-{
-    fn new(exec: Executor<O, E>, cfg: PgConfig) -> Self {
+impl Pipeline for Pgrx {
+    fn new(exec: Executor, cfg: PgConfig) -> Self {
         Pgrx { exec, cfg }
     }
 
     /// Returns the Executor passed to [`Self::new`].
-    fn executor(&mut self) -> &mut Executor<O, E> {
+    fn executor(&mut self) -> &mut Executor {
         &mut self.exec
     }
 

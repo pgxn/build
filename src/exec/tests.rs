@@ -1,7 +1,7 @@
 use super::*;
 use crate::error::BuildError;
 use crate::line;
-use crate::tests::compile_mock;
+use crate::tests::{compile_mock, test_writer};
 use assertables::*;
 use std::str;
 use tempfile::tempdir;
@@ -28,11 +28,9 @@ fn execute() -> Result<(), BuildError> {
     compile_mock("emit", &dest);
 
     // Set up buffers for output.
-    let mut out = Vec::new();
-    let mut err = Vec::new();
-    let stdout = line::LineWriter::new(&mut out);
-    let stderr = line::LineWriter::new(&mut err);
-    let mut exec = Executor::new(tmp.as_ref(), stdout, stderr);
+    let (writer, stdout, stderr) = test_writer();
+
+    let mut exec = Executor::new(writer, tmp.as_ref());
 
     // Run the app.
     let mut cmd = Command::new(&dest);
@@ -50,9 +48,11 @@ fn execute() -> Result<(), BuildError> {
     }
 
     // Check the output.
-    let res = str::from_utf8(out.as_slice()).unwrap();
+    let out = stdout.freeze();
+    let err = stderr.freeze();
+    let res = str::from_utf8(out.as_bytes()).unwrap();
     assert_eq!("this is standard output\nmore standard output\n", res);
-    let res = str::from_utf8(err.as_slice()).unwrap();
+    let res = str::from_utf8(err.as_bytes()).unwrap();
     assert_eq!("this is error output\nmore error output\n", res);
 
     // Test nonexistent file.

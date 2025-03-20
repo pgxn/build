@@ -1,7 +1,48 @@
+use crate::line::LineWriter;
+use crate::writer::Writer;
+
 use super::*;
+use bytes::{BufMut, BytesMut};
 use serde_json::{json, Value};
-use std::{collections::HashMap, fs::File, io::Write, path::PathBuf, process::Command};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{self, Write},
+    path::PathBuf,
+    process::Command,
+};
 use tempfile::tempdir;
+
+pub struct BufferWriter {
+    buffer: BytesMut,
+}
+
+impl Write for BufferWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.buffer.put(buf);
+
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+pub fn test_writer() -> (Writer, BytesMut, BytesMut) {
+    let out_buffer = BytesMut::new();
+    let err_buffer = BytesMut::new();
+
+    let stdout = LineWriter::new(BufferWriter {
+        buffer: out_buffer.clone(),
+    });
+    let stderr = LineWriter::new(BufferWriter {
+        buffer: err_buffer.clone(),
+    });
+
+    let writer = Writer::new(stdout, stderr);
+    (writer, out_buffer, err_buffer)
+}
 
 fn release_meta(pipeline: &str) -> Value {
     json!({

@@ -1,6 +1,6 @@
 //! Stream STDOUT and STDERR output from a Command to buffers.
-use crate::error::BuildError;
 use crate::line::WriteLine;
+use crate::{error::BuildError, writer::Writer};
 use log::debug;
 use std::{
     clone::Clone,
@@ -28,29 +28,19 @@ impl Output {
 
 /// Command execution context.
 #[derive(Debug, PartialEq)]
-pub(crate) struct Executor<O, E>
-where
-    O: WriteLine,
-    E: WriteLine,
-{
+pub(crate) struct Executor {
     dir: PathBuf,
-    out: O,
-    err: E,
+    writer: Writer,
 }
 
-impl<O, E> Executor<O, E>
-where
-    O: WriteLine,
-    E: WriteLine,
-{
+impl Executor {
     /// Creates a new command execution context. Commands passed to
     /// [`execute`] will have their current directory set to `dir`. STDOUT
     /// lines will be sent to `out` and STDERR lines will be sent to err.
-    pub fn new(dir: impl Into<PathBuf>, out: O, err: E) -> Self {
+    pub fn new(writer: Writer, dir: impl Into<PathBuf>) -> Self {
         Self {
             dir: dir.into(),
-            out,
-            err,
+            writer,
         }
     }
 
@@ -108,9 +98,9 @@ where
         // Read the lines from the spawned threads and format send them to the buffers.
         for output in rx {
             if output.is_err {
-                self.err.write_line(&output.line)?;
+                self.writer.write_error(&output.line)?;
             } else {
-                self.out.write_line(&output.line)?;
+                self.writer.write_line(&output.line)?;
             }
         }
 

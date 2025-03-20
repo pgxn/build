@@ -8,13 +8,9 @@ use std::{io::Write, path::Path, process::Command};
 
 /// Defines the interface for build pipelines to configure, compile, and test
 /// PGXN distributions.
-pub(crate) trait Pipeline<
-    O: WriteLine = line::LineWriter<std::io::Stdout>,
-    E: WriteLine = line::LineWriter<std::io::Stdout>,
->
-{
+pub(crate) trait Pipeline {
     /// Creates an instance of a Pipeline.
-    fn new(exec: Executor<O, E>, pg_config: PgConfig) -> Self;
+    fn new(exec: Executor, pg_config: PgConfig) -> Self;
 
     /// Returns a score for the confidence that this pipeline can build the
     /// contents of `dir`. A score of 0 means no confidence and 255 means the
@@ -35,7 +31,7 @@ pub(crate) trait Pipeline<
     fn test(&mut self) -> Result<(), BuildError>;
 
     /// Returns the Executor passed to [`new`].
-    fn executor(&mut self) -> &mut Executor<O, E>;
+    fn executor(&mut self) -> &mut Executor;
 
     /// Returns the PgConfig passed to [`new`].
     fn pg_config(&self) -> &PgConfig;

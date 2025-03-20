@@ -21,20 +21,13 @@ use std::{
 ///
 /// [PGXS]: https://www.postgresql.org/docs/current/extend-pgxs.html
 #[derive(Debug, PartialEq)]
-pub(crate) struct Pgxs<
-    O: WriteLine = line::LineWriter<std::io::Stdout>,
-    E: WriteLine = line::LineWriter<std::io::Stdout>,
-> {
-    exec: Executor<O, E>,
+pub(crate) struct Pgxs {
+    exec: Executor,
     cfg: PgConfig,
 }
 
-impl<O, E> Pipeline<O, E> for Pgxs<O, E>
-where
-    O: WriteLine,
-    E: WriteLine,
-{
-    fn new(exec: Executor<O, E>, cfg: PgConfig) -> Self {
+impl Pipeline for Pgxs {
+    fn new(exec: Executor, cfg: PgConfig) -> Self {
         Pgxs { exec, cfg }
     }
 
@@ -78,7 +71,7 @@ where
     }
 
     /// Returns the Executor passed to [`Self::new`].
-    fn executor(&mut self) -> &mut Executor<O, E> {
+    fn executor(&mut self) -> &mut Executor {
         &mut self.exec
     }
 

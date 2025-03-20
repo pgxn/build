@@ -15,6 +15,7 @@ mod pg_config;
 mod pgrx;
 mod pgxs;
 mod pipeline;
+mod writer;
 
 use crate::{error::BuildError, pgrx::Pgrx, pgxs::Pgxs, pipeline::Pipeline};
 pub use api::Api;
@@ -25,23 +26,19 @@ use pgxn_meta::{dist, release::Release};
 use std::path::Path;
 
 /// Defines the types of builders.
-#[derive(PartialEq)]
-enum Build<O: WriteLine, E: WriteLine> {
+#[derive(PartialEq, Debug)]
+enum Build {
     /// Defines a builder using the PGXS pipeline.
-    Pgxs(Pgxs<O, E>),
+    Pgxs(Pgxs),
 
     /// Defines a builder using the pgrx pipeline.
-    Pgrx(Pgrx<O, E>),
+    Pgrx(Pgrx),
 }
 
-impl<O: WriteLine, E: WriteLine> Build<O, E> {
+impl Build {
     /// Returns a build pipeline identified by `pipe`, or an error if `pipe`
     /// is unknown.
-    fn new(
-        pipe: &dist::Pipeline,
-        exec: Executor<O, E>,
-        cfg: PgConfig,
-    ) -> Result<Build<O, E>, BuildError> {
+    fn new(pipe: &dist::Pipeline, exec: Executor, cfg: PgConfig) -> Result<Build, BuildError> {
         match pipe {
             dist::Pipeline::Pgxs => Ok(Build::Pgxs(Pgxs::new(exec, cfg))),
             dist::Pipeline::Pgrx => Ok(Build::Pgrx(Pgrx::new(exec, cfg))),
@@ -51,13 +48,13 @@ impl<O: WriteLine, E: WriteLine> Build<O, E> {
 
     /// Attempts to detect and return the appropriate build pipeline to build
     /// the contents of `dir`. Returns an error if no pipeline can do so.
-    fn detect(exec: Executor<O, E>, cfg: PgConfig) -> Result<Build<O, E>, BuildError> {
+    fn detect(exec: Executor, cfg: PgConfig) -> Result<Build, BuildError> {
         // Start with PGXS.
-        let mut score = Pgxs::<O, E>::confidence(exec.dir());
+        let mut score = Pgxs::confidence(exec.dir());
         let mut pipe = dist::Pipeline::Pgxs;
 
         // Does pgrx have a higher score?
-        let c = Pgrx::<O, E>::confidence(exec.dir());
+        let c = Pgrx::confidence(exec.dir());
         if c > score {
             score = c;
             pipe = dist::Pipeline::Pgrx;
@@ -80,14 +77,14 @@ impl<O: WriteLine, E: WriteLine> Build<O, E> {
 
 /// Builder builds PGXN releases.
 // TODO #[derive(Debug, PartialEq)]
-pub(crate) struct Builder<O: WriteLine, E: WriteLine> {
-    pipeline: Build<O, E>,
+pub(crate) struct Builder {
+    pipeline: Build,
     meta: Release,
 }
 
-impl<O: WriteLine, E: WriteLine> Builder<O, E> {
+impl Builder {
     /// Creates and returns a new builder using the appropriate pipeline.
-    pub fn new(exec: Executor<O, E>, meta: Release, cfg: PgConfig) -> Result<Self, BuildError> {
+    pub fn new(exec: Executor, meta: Release, cfg: PgConfig) -> Result<Self, BuildError> {
         let pipeline = if let Some(deps) = meta.dependencies() {
             if let Some(pipe) = deps.pipeline() {
                 Build::new(pipe, exec, cfg)?

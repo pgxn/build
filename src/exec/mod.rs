@@ -11,6 +11,9 @@ use std::{
     thread,
 };
 
+#[cfg(test)]
+mod tests;
+
 // Define a structure fo capturing output.
 struct Output {
     line: String,

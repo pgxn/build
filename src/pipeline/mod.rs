@@ -94,7 +94,7 @@ pub(crate) trait Pipeline<P: AsRef<Path>> {
     {
         // Use `sudo` if the param is set.
         let mut cmd = self.maybe_sudo(program, sudo);
-        cmd.args(args).current_dir(self.dir());
+        cmd.args(args);
 
         // Collect the output buffers.
         let mut stdout = self.stdout();

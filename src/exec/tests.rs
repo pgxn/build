@@ -26,9 +26,6 @@ fn execute() -> Result<(), BuildError> {
         .display()
         .to_string();
     compile_mock("emit", &dest);
-    let mut cmd = Command::new(dest);
-    cmd.arg("this is standard output")
-        .arg("this is error output");
 
     // Set up buffers for output.
     let mut out = Vec::new();
@@ -38,15 +35,25 @@ fn execute() -> Result<(), BuildError> {
     let mut exec = Executor::new(&tmp, stdout, stderr);
 
     // Run the app.
+    let mut cmd = Command::new(&dest);
+    cmd.arg("this is standard output")
+        .arg("this is error output");
+    if let Err(e) = exec.execute(cmd) {
+        panic!("emit execution failed: {e}");
+    }
+
+    // Run it again.
+    let mut cmd = Command::new(&dest);
+    cmd.arg("more standard output").arg("more error output");
     if let Err(e) = exec.execute(cmd) {
         panic!("emit execution failed: {e}");
     }
 
     // Check the output.
     let res = str::from_utf8(out.as_slice()).unwrap();
-    assert_eq!("this is standard output\n", res);
+    assert_eq!("this is standard output\nmore standard output\n", res);
     let res = str::from_utf8(err.as_slice()).unwrap();
-    assert_eq!("this is error output\n", res);
+    assert_eq!("this is error output\nmore error output\n", res);
 
     // Test nonexistent file.
     let mut out = Vec::new();

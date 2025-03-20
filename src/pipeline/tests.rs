@@ -5,30 +5,28 @@ use assertables::*;
 use std::{collections::HashMap, env, str};
 use tempfile::tempdir;
 
-struct TestPipeline<P, O, E>
+struct TestPipeline<O: WriteLine, E: WriteLine>
 where
-    P: AsRef<Path>,
     O: WriteLine,
     E: WriteLine,
 {
-    exec: Executor<P, O, E>,
+    exec: Executor<O, E>,
     cfg: PgConfig,
     // out: Vec<u8>,
     // err: Vec<u8>,
 }
 
 // Create a mock version of the trait.
-impl<P, O, E> Pipeline<P, O, E> for TestPipeline<P, O, E>
+impl<O, E> Pipeline<O, E> for TestPipeline<O, E>
 where
-    P: AsRef<Path>,
     O: WriteLine,
     E: WriteLine,
 {
-    fn new(exec: Executor<P, O, E>, cfg: PgConfig) -> Self {
+    fn new(exec: Executor<O, E>, cfg: PgConfig) -> Self {
         TestPipeline { exec, cfg }
     }
 
-    fn executor(&mut self) -> &mut Executor<P, O, E> {
+    fn executor(&mut self) -> &mut Executor<O, E> {
         &mut self.exec
     }
 
@@ -36,7 +34,7 @@ where
         &self.cfg
     }
 
-    fn confidence(_: P) -> u8 {
+    fn confidence(_: impl AsRef<Path>) -> u8 {
         0
     }
 

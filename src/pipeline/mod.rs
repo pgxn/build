@@ -8,19 +8,18 @@ use std::{io::Write, path::Path, process::Command};
 
 /// Defines the interface for build pipelines to configure, compile, and test
 /// PGXN distributions.
-pub(crate) trait Pipeline<P, O, E>
-where
-    P: AsRef<Path>,
-    O: WriteLine,
-    E: WriteLine,
+pub(crate) trait Pipeline<
+    O: WriteLine = line::LineWriter<std::io::Stdout>,
+    E: WriteLine = line::LineWriter<std::io::Stdout>,
+>
 {
     /// Creates an instance of a Pipeline.
-    fn new(exec: Executor<P, O, E>, pg_config: PgConfig) -> Self;
+    fn new(exec: Executor<O, E>, pg_config: PgConfig) -> Self;
 
     /// Returns a score for the confidence that this pipeline can build the
     /// contents of `dir`. A score of 0 means no confidence and 255 means the
     /// highest confidence.
-    fn confidence(dir: P) -> u8;
+    fn confidence(dir: impl AsRef<Path>) -> u8;
 
     /// Configures a distribution to build on a particular platform and
     /// Postgres version.
@@ -36,7 +35,7 @@ where
     fn test(&mut self) -> Result<(), BuildError>;
 
     /// Returns the Executor passed to [`new`].
-    fn executor(&mut self) -> &mut Executor<P, O, E>;
+    fn executor(&mut self) -> &mut Executor<O, E>;
 
     /// Returns the PgConfig passed to [`new`].
     fn pg_config(&self) -> &PgConfig;

@@ -9,29 +9,27 @@ use std::path::Path;
 /// Builder implementation for [pgrx] Pipelines.
 ///
 /// [pgrx]: https://github.com/pgcentralfoundation/pgrx
-#[derive(Debug, PartialEq)]
-pub(crate) struct Pgrx<P, O, E>
+#[derive(PartialEq)]
+pub(crate) struct Pgrx<O, E>
 where
-    P: AsRef<Path>,
     O: WriteLine,
     E: WriteLine,
 {
-    exec: Executor<P, O, E>,
+    exec: Executor<O, E>,
     cfg: PgConfig,
 }
 
-impl<P, O, E> Pipeline<P, O, E> for Pgrx<P, O, E>
+impl<O, E> Pipeline<O, E> for Pgrx<O, E>
 where
-    P: AsRef<Path>,
     O: WriteLine,
     E: WriteLine,
 {
-    fn new(exec: Executor<P, O, E>, cfg: PgConfig) -> Self {
+    fn new(exec: Executor<O, E>, cfg: PgConfig) -> Self {
         Pgrx { exec, cfg }
     }
 
     /// Returns the Executor passed to [`Self::new`].
-    fn executor(&mut self) -> &mut Executor<P, O, E> {
+    fn executor(&mut self) -> &mut Executor<O, E> {
         &mut self.exec
     }
 
@@ -44,7 +42,7 @@ where
     /// contents of `dir`. Returns 255 if it contains a file named
     /// `Cargo.toml` and lists pgrx as a dependency. Otherwise returns 1 if
     /// `Cargo.toml` exists and 0 if it does not.
-    fn confidence(dir: P) -> u8 {
+    fn confidence(dir: impl AsRef<Path>) -> u8 {
         let file = dir.as_ref().join("Cargo.toml");
         if !file.exists() {
             return 0;

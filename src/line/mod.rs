@@ -1,5 +1,8 @@
 use owo_colors::Style;
-use std::io::{Result, Write};
+use std::{
+    fmt,
+    io::{Result, Write},
+};
 
 // WriteLine extends [io::Write] to add a function for writing a line of text.
 pub trait WriteLine: Write {
@@ -8,16 +11,16 @@ pub trait WriteLine: Write {
 
 // LineWriter implements WriteLine to write a line of text to an internal
 // [std::io::Write] implementation.
-pub struct LineWriter<'a, T: Write>(&'a mut T);
+pub struct LineWriter<T: Write>(T);
 
-impl<'a, T: Write> LineWriter<'a, T> {
+impl<T: Write> LineWriter<T> {
     // Create a new LineWriter that writes lines of text to `writer`.
-    pub fn new(writer: &'a mut T) -> Self {
+    pub fn new(writer: T) -> Self {
         Self(writer)
     }
 }
 
-impl<'a, T: Write> Write for LineWriter<'a, T> {
+impl<T: Write> Write for LineWriter<T> {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         self.0.write(buf)
     }
@@ -27,7 +30,7 @@ impl<'a, T: Write> Write for LineWriter<'a, T> {
     }
 }
 
-impl<'a, T: Write> WriteLine for LineWriter<'a, T> {
+impl<T: Write> WriteLine for LineWriter<T> {
     // Write `line` to the underlying writer.
     fn write_line(&mut self, line: &str) -> Result<()> {
         writeln!(self.0, "{}", line)

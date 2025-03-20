@@ -34,6 +34,8 @@ fn confidence() -> Result<(), BuildError> {
 fn new() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let cfg = PgConfig::from_map(HashMap::new());
+
+    let exec = Executor::new(dir, LineWriter::new(vec![]), LineWriter::new(vec![]))
     let pipe = Pgrx::new(dir, cfg.clone());
     assert_eq!(dir, pipe.dir);
     assert_eq!(&dir, pipe.dir());

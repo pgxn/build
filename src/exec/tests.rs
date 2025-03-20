@@ -32,7 +32,7 @@ fn execute() -> Result<(), BuildError> {
     let mut err = Vec::new();
     let stdout = line::LineWriter::new(&mut out);
     let stderr = line::LineWriter::new(&mut err);
-    let mut exec = Executor::new(&tmp, stdout, stderr);
+    let mut exec = Executor::new(tmp.as_ref(), stdout, stderr);
 
     // Run the app.
     let mut cmd = Command::new(&dest);
@@ -60,7 +60,7 @@ fn execute() -> Result<(), BuildError> {
     let mut err = Vec::new();
     let stdout = line::LineWriter::new(&mut out);
     let stderr = line::LineWriter::new(&mut err);
-    let mut exec = Executor::new(&tmp, stdout, stderr);
+    let mut exec = Executor::new(tmp.as_ref(), stdout, stderr);
     match exec.execute(Command::new("__nonesuch_nope__")) {
         Ok(_) => panic!("Nonexistent file unexpectedly succeeded"),
         Err(e) => {
@@ -76,7 +76,7 @@ fn execute() -> Result<(), BuildError> {
     let mut err = Vec::new();
     let stdout = line::LineWriter::new(&mut out);
     let stderr = line::LineWriter::new(&mut err);
-    let mut exec = Executor::new(&tmp, stdout, stderr);
+    let mut exec = Executor::new(tmp.as_ref(), stdout, stderr);
     let path = tmp.path().join("exit_err").display().to_string();
     compile_mock("exit_err", &path);
     match exec.execute(Command::new(&path)) {

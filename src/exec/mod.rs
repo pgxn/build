@@ -5,7 +5,7 @@ use log::debug;
 use std::{
     clone::Clone,
     io::{self, BufRead, BufReader},
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::mpsc,
     thread,
@@ -28,32 +28,34 @@ impl Output {
 
 /// Command execution context.
 #[derive(Debug, PartialEq)]
-pub(crate) struct Executor<P, O, E>
+pub(crate) struct Executor<O, E>
 where
-    P: AsRef<Path>,
     O: WriteLine,
     E: WriteLine,
 {
-    dir: P,
+    dir: PathBuf,
     out: O,
     err: E,
 }
 
-impl<P, O, E> Executor<P, O, E>
+impl<O, E> Executor<O, E>
 where
-    P: AsRef<Path>,
     O: WriteLine,
     E: WriteLine,
 {
     /// Creates a new command execution context. Commands passed to
     /// [`execute`] will have their current directory set to `dir`. STDOUT
     /// lines will be sent to `out` and STDERR lines will be sent to err.
-    pub fn new(dir: P, out: O, err: E) -> Self {
-        Self { dir, out, err }
+    pub fn new(dir: impl Into<PathBuf>, out: O, err: E) -> Self {
+        Self {
+            dir: dir.into(),
+            out,
+            err,
+        }
     }
 
     /// Returns the directory passed to [`Self::new`].
-    pub fn dir(&self) -> &P {
+    pub fn dir(&self) -> &PathBuf {
         &self.dir
     }
 

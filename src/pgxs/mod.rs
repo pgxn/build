@@ -3,7 +3,11 @@
 //! [PGXS]: https://www.postgresql.org/docs/current/extend-pgxs.html
 
 use crate::{
-    error::BuildError, exec::Executor, line::WriteLine, pg_config::PgConfig, pipeline::Pipeline,
+    error::BuildError,
+    exec::Executor,
+    line::{self, WriteLine},
+    pg_config::PgConfig,
+    pipeline::Pipeline,
 };
 use log::{debug, info};
 use regex::Regex;
@@ -17,23 +21,20 @@ use std::{
 ///
 /// [PGXS]: https://www.postgresql.org/docs/current/extend-pgxs.html
 #[derive(Debug, PartialEq)]
-pub(crate) struct Pgxs<P, O, E>
-where
-    P: AsRef<Path>,
-    O: WriteLine,
-    E: WriteLine,
-{
-    exec: Executor<P, O, E>,
+pub(crate) struct Pgxs<
+    O: WriteLine = line::LineWriter<std::io::Stdout>,
+    E: WriteLine = line::LineWriter<std::io::Stdout>,
+> {
+    exec: Executor<O, E>,
     cfg: PgConfig,
 }
 
-impl<P, O, E> Pipeline<P, O, E> for Pgxs<P, O, E>
+impl<O, E> Pipeline<O, E> for Pgxs<O, E>
 where
-    P: AsRef<Path>,
     O: WriteLine,
     E: WriteLine,
 {
-    fn new(exec: Executor<P, O, E>, cfg: PgConfig) -> Self {
+    fn new(exec: Executor<O, E>, cfg: PgConfig) -> Self {
         Pgxs { exec, cfg }
     }
 
@@ -45,7 +46,7 @@ where
     /// *   Returns 200 if it declares variables named `MODULES`,
     ///     `MODULE_big`, `PROGRAM`, `EXTENSION`, `DATA`, or `DATA_built`
     /// *   Otherwise returns 127
-    fn confidence(dir: P) -> u8 {
+    fn confidence(dir: impl AsRef<Path>) -> u8 {
         let file = match makefile(dir.as_ref()) {
             Some(f) => f,
             None => return 0,
@@ -77,7 +78,7 @@ where
     }
 
     /// Returns the Executor passed to [`Self::new`].
-    fn executor(&mut self) -> &mut Executor<P, O, E> {
+    fn executor(&mut self) -> &mut Executor<O, E> {
         &mut self.exec
     }
 
@@ -88,7 +89,7 @@ where
 
     fn configure(&mut self) -> Result<(), BuildError> {
         // Run configure if it exists.
-        if let Ok(ok) = fs::exists(self.exec.dir().as_ref().join("configure")) {
+        if let Ok(ok) = fs::exists(self.exec.dir().join("configure")) {
             if ok {
                 info!("running configure");
                 // "." will not work on VMS or MacOS Classic.

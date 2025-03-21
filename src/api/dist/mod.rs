@@ -3,6 +3,7 @@
 //! [Dist API]: https://github.com/pgxn/pgxn-api/wiki/dist-api
 
 use chrono::{DateTime, Utc};
+use log::{debug, info};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::{borrow::Borrow, io};
@@ -89,13 +90,17 @@ impl Dist {
     /// returns the latest unstable versions. Returns an error if there are no
     /// versions at all.
     pub fn best_version(&self) -> Result<&Version, BuildError> {
+        debug!(of = self.name(); "Determining best version");
         if let Some(v) = self.latest_stable_version() {
+            info!(of=self.name(), v:display; "Best version");
             return Ok(v);
         }
         if let Some(v) = self.latest_testing_version() {
+            info!(of=self.name(), v:display; "Best version");
             return Ok(v);
         }
         if let Some(v) = self.latest_unstable_version() {
+            info!(of=self.name(), v:display; "Best version");
             return Ok(v);
         }
 

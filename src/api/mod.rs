@@ -9,7 +9,7 @@ pub use dist::Dist;
 use crate::error::BuildError;
 use iri_string::spec;
 use iri_string::template::{simple_context::SimpleContext, UriTemplateStr, UriTemplateString};
-use log::{debug, info};
+use log::{debug, info, trace};
 use semver::Version;
 use serde_json::{json, Value};
 use std::{
@@ -124,7 +124,7 @@ impl Api {
         let first = archive
             .by_index(0)?
             .enclosed_name()
-            .ok_or_else(|| zip::result::ZipError::FileNotFound)?;
+            .ok_or(zip::result::ZipError::FileNotFound)?;
         Ok(into.as_ref().join(first))
     }
 
@@ -299,6 +299,7 @@ fn fetch_templates(
 
     let mut map: HashMap<String, UriTemplateString> = HashMap::with_capacity(obj.len());
     for (k, v) in obj.into_iter() {
+        trace!(template:display=k, url:display=v; "load");
         let str = v.as_str().ok_or_else(|| {
             BuildError::Type(
                 format!("template {} in {}", json!(k), url),

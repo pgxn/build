@@ -61,7 +61,7 @@ pub(crate) trait Pipeline<
     /// Attempts to write a temporary file to `dir` and returns `true` on
     /// success and `false` on failure. The temporary file will be deleted.
     fn is_writeable<D: AsRef<Path>>(&self, dir: D) -> bool {
-        debug!(dir:? = crate::filename(&dir); "testing write access");
+        debug!(dir:display = crate::filename(&dir); "testing write access");
         match tempfile::Builder::new()
             .prefix("pgxn-")
             .suffix(".test")

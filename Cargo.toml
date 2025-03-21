@@ -21,7 +21,7 @@ hex = "0.4.3"
 iri-string = "0.7.8"
 log = { version = "0.4.26", features = ["kv"] }
 owo-colors = "4.2.0"
-pgxn_meta = "0.5.2"
+pgxn_meta = { version= "0.5.2", git = "https://github.com/pgxn/meta", rev = "a65da03c" }
 regex = "1.11.1"
 semver = "1.0.26"
 serde = "1.0.219"

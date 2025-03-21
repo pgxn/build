@@ -1685,7 +1685,7 @@ dependencies = [
 [[package]]
 name = "pgxn_meta"
 version = "0.5.2"
-source = "git+https://github.com/pgxn/meta?rev=a65da03c#a65da03c4c71975c54196b45a8cc068fd34437dc"
+source = "git+https://github.com/pgxn/meta?rev=6785f7e#6785f7ea1ce67ed495c85c211bbe4d4bb85e8467"
 dependencies = [
  "base64 0.22.1",
  "boon",

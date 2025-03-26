@@ -1,4 +1,5 @@
 use super::*;
+use crate::line::LineWriter;
 use assertables::*;
 #[cfg(target_family = "unix")]
 use std::os::unix::fs::PermissionsExt;
@@ -57,23 +58,33 @@ fn confidence() -> Result<(), BuildError> {
 fn new() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let cfg = PgConfig::from_map(HashMap::new());
-    let pipe = Pgxs::new(dir, cfg.clone());
-    assert_eq!(dir, pipe.dir);
-    assert_eq!(&dir, pipe.dir());
-    assert_eq!(&cfg, pipe.pg_config());
+    {
+        // Test basic success.
+        let exec = Executor::new(dir, LineWriter::new(vec![]), LineWriter::new(vec![]));
+        let mut pipe = Pgxs::new(exec, cfg.clone());
+        let exec = Executor::new(dir, LineWriter::new(vec![]), LineWriter::new(vec![]));
+        assert_eq!(&exec, pipe.executor());
+        assert_eq!(&cfg, pipe.pg_config());
+    }
 
     let dir2 = dir.join("corpus");
     let cfg2 = PgConfig::from_map(HashMap::from([("bindir".to_string(), "bin".to_string())]));
-    let pipe = Pgxs::new(dir2.as_path(), cfg2.clone());
-    assert_eq!(dir2, pipe.dir);
-    assert_eq!(&dir2, pipe.dir());
+    let exec2 = Executor::new(&dir2, LineWriter::new(vec![]), LineWriter::new(vec![]));
+    let mut pipe = Pgxs::new(exec2, cfg2.clone());
+    let exec2 = Executor::new(&dir2, LineWriter::new(vec![]), LineWriter::new(vec![]));
+    assert_eq!(&exec2, pipe.executor());
     assert_eq!(&cfg2, pipe.pg_config());
 }
 
 #[test]
 fn configure() -> Result<(), BuildError> {
     let tmp = tempdir()?;
-    let pipe = Pgxs::new(&tmp, PgConfig::from_map(HashMap::new()));
+    let exec = Executor::new(
+        tmp.as_ref(),
+        LineWriter::new(vec![]),
+        LineWriter::new(vec![]),
+    );
+    let mut pipe = Pgxs::new(exec, PgConfig::from_map(HashMap::new()));
 
     // Try with no Configure file.
     if let Err(e) = pipe.configure() {
@@ -92,6 +103,7 @@ fn configure() -> Result<(), BuildError> {
     match pipe.configure() {
         Ok(_) => panic!("configure unexpectedly succeeded"),
         Err(e) => {
+            println!("OUTPUT {e}");
             assert_starts_with!(e.to_string(), "executing ");
             assert_ends_with!(
                 e.to_string(),
@@ -125,7 +137,8 @@ fn configure() -> Result<(), BuildError> {
 #[test]
 fn compile() -> Result<(), BuildError> {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let pipe = Pgxs::new(dir, PgConfig::from_map(HashMap::new()));
+    let exec = Executor::new(dir, LineWriter::new(vec![]), LineWriter::new(vec![]));
+    let mut pipe = Pgxs::new(exec, PgConfig::from_map(HashMap::new()));
     assert!(pipe.compile().is_err());
     Ok(())
 }
@@ -133,7 +146,8 @@ fn compile() -> Result<(), BuildError> {
 #[test]
 fn test() -> Result<(), BuildError> {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let pipe = Pgxs::new(dir, PgConfig::from_map(HashMap::new()));
+    let exec = Executor::new(dir, LineWriter::new(vec![]), LineWriter::new(vec![]));
+    let mut pipe = Pgxs::new(exec, PgConfig::from_map(HashMap::new()));
     assert!(pipe.test().is_err());
     Ok(())
 }
@@ -141,7 +155,8 @@ fn test() -> Result<(), BuildError> {
 #[test]
 fn install() -> Result<(), BuildError> {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let pipe = Pgxs::new(dir, PgConfig::from_map(HashMap::new()));
+    let exec = Executor::new(dir, LineWriter::new(vec![]), LineWriter::new(vec![]));
+    let mut pipe = Pgxs::new(exec, PgConfig::from_map(HashMap::new()));
     assert!(pipe.install().is_err());
     Ok(())
 }

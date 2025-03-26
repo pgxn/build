@@ -2,9 +2,8 @@
 //!
 //! [PGXS]: https://www.postgresql.org/docs/current/extend-pgxs.html
 
-use crate::pipeline::Pipeline;
-use crate::{error::BuildError, pg_config::PgConfig};
-use log::info;
+use crate::{error::BuildError, exec::Executor, pg_config::PgConfig, pipeline::Pipeline};
+use log::{debug, info};
 use regex::Regex;
 use std::{
     fs::{self, File},
@@ -16,14 +15,14 @@ use std::{
 ///
 /// [PGXS]: https://www.postgresql.org/docs/current/extend-pgxs.html
 #[derive(Debug, PartialEq)]
-pub(crate) struct Pgxs<P: AsRef<Path>> {
+pub(crate) struct Pgxs {
+    exec: Executor,
     cfg: PgConfig,
-    dir: P,
 }
 
-impl<P: AsRef<Path>> Pipeline<P> for Pgxs<P> {
-    fn new(dir: P, cfg: PgConfig) -> Self {
-        Pgxs { cfg, dir }
+impl Pipeline for Pgxs {
+    fn new(exec: Executor, cfg: PgConfig) -> Self {
+        Pgxs { exec, cfg }
     }
 
     /// Determines the confidence that the Pgxs pipeline can build the
@@ -34,7 +33,7 @@ impl<P: AsRef<Path>> Pipeline<P> for Pgxs<P> {
     /// *   Returns 200 if it declares variables named `MODULES`,
     ///     `MODULE_big`, `PROGRAM`, `EXTENSION`, `DATA`, or `DATA_built`
     /// *   Otherwise returns 127
-    fn confidence(dir: P) -> u8 {
+    fn confidence(dir: impl AsRef<Path>) -> u8 {
         let file = match makefile(dir.as_ref()) {
             Some(f) => f,
             None => return 0,
@@ -65,9 +64,9 @@ impl<P: AsRef<Path>> Pipeline<P> for Pgxs<P> {
         score
     }
 
-    /// Returns the directory passed to [`Self::new`].
-    fn dir(&self) -> &P {
-        &self.dir
+    /// Returns the Executor passed to [`Self::new`].
+    fn executor(&mut self) -> &mut Executor {
+        &mut self.exec
     }
 
     /// Returns the PgConfig passed to [`Self::new`].
@@ -75,9 +74,9 @@ impl<P: AsRef<Path>> Pipeline<P> for Pgxs<P> {
         &self.cfg
     }
 
-    fn configure(&self) -> Result<(), BuildError> {
+    fn configure(&mut self) -> Result<(), BuildError> {
         // Run configure if it exists.
-        if let Ok(ok) = fs::exists(self.dir().as_ref().join("configure")) {
+        if let Ok(ok) = fs::exists(self.exec.dir().join("configure")) {
             if ok {
                 info!("running configure");
                 // "." will not work on VMS or MacOS Classic.
@@ -89,19 +88,19 @@ impl<P: AsRef<Path>> Pipeline<P> for Pgxs<P> {
         Ok(())
     }
 
-    fn compile(&self) -> Result<(), BuildError> {
+    fn compile(&mut self) -> Result<(), BuildError> {
         info!("building extension");
         self.run("make", ["all"], false)?;
         Ok(())
     }
 
-    fn test(&self) -> Result<(), BuildError> {
+    fn test(&mut self) -> Result<(), BuildError> {
         info!("testing extension");
         self.run("make", ["installcheck"], false)?;
         Ok(())
     }
 
-    fn install(&self) -> Result<(), BuildError> {
+    fn install(&mut self) -> Result<(), BuildError> {
         info!("installing extension");
         self.run("make", ["install"], true)?;
         Ok(())
@@ -114,6 +113,7 @@ fn makefile(dir: &Path) -> Option<PathBuf> {
     for makefile in ["GNUmakefile", "makefile", "Makefile"] {
         let file = dir.join(makefile);
         if file.exists() {
+            debug!("Found {:?}", file);
             return Some(file);
         }
     }

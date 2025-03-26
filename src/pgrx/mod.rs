@@ -2,28 +2,27 @@
 //!
 //! [pgrx]: https://github.com/pgcentralfoundation/pgrx
 
-use crate::error::BuildError;
-use crate::pg_config::PgConfig;
 use crate::pipeline::Pipeline;
+use crate::{error::BuildError, exec::Executor, pg_config::PgConfig};
 use std::path::Path;
 
 /// Builder implementation for [pgrx] Pipelines.
 ///
 /// [pgrx]: https://github.com/pgcentralfoundation/pgrx
 #[derive(Debug, PartialEq)]
-pub(crate) struct Pgrx<P: AsRef<Path>> {
+pub(crate) struct Pgrx {
+    exec: Executor,
     cfg: PgConfig,
-    dir: P,
 }
 
-impl<P: AsRef<Path>> Pipeline<P> for Pgrx<P> {
-    fn new(dir: P, cfg: PgConfig) -> Self {
-        Pgrx { cfg, dir }
+impl Pipeline for Pgrx {
+    fn new(exec: Executor, cfg: PgConfig) -> Self {
+        Pgrx { exec, cfg }
     }
 
-    /// Returns the directory passed to [`Self::new`].
-    fn dir(&self) -> &P {
-        &self.dir
+    /// Returns the Executor passed to [`Self::new`].
+    fn executor(&mut self) -> &mut Executor {
+        &mut self.exec
     }
 
     /// Returns the PgConfig passed to [`Self::new`].
@@ -35,7 +34,7 @@ impl<P: AsRef<Path>> Pipeline<P> for Pgrx<P> {
     /// contents of `dir`. Returns 255 if it contains a file named
     /// `Cargo.toml` and lists pgrx as a dependency. Otherwise returns 1 if
     /// `Cargo.toml` exists and 0 if it does not.
-    fn confidence(dir: P) -> u8 {
+    fn confidence(dir: impl AsRef<Path>) -> u8 {
         let file = dir.as_ref().join("Cargo.toml");
         if !file.exists() {
             return 0;
@@ -54,22 +53,22 @@ impl<P: AsRef<Path>> Pipeline<P> for Pgrx<P> {
     }
 
     /// Runs `cargo init`.
-    fn configure(&self) -> Result<(), BuildError> {
+    fn configure(&mut self) -> Result<(), BuildError> {
         Ok(())
     }
 
     /// Runs `cargo build`.
-    fn compile(&self) -> Result<(), BuildError> {
+    fn compile(&mut self) -> Result<(), BuildError> {
         Ok(())
     }
 
     /// Runs `cargo test`.
-    fn test(&self) -> Result<(), BuildError> {
+    fn test(&mut self) -> Result<(), BuildError> {
         Ok(())
     }
 
     /// Runs `cargo install`.
-    fn install(&self) -> Result<(), BuildError> {
+    fn install(&mut self) -> Result<(), BuildError> {
         Ok(())
     }
 }

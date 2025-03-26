@@ -1,10 +1,16 @@
 use super::*;
+use crate::line::LineWriter;
 use std::{collections::HashMap, fs::File, io::Write};
 use tempfile::tempdir;
 
 #[test]
 fn confidence() -> Result<(), BuildError> {
     let tmp = tempdir()?;
+    // let mut out = Vec::new();
+    // let mut err = Vec::new();
+    // // Test basic success.
+    // let exec = Executor::new(&tmp, LineWriter::new(&mut out), LineWriter::new(&mut err));
+
     // No Cargo.toml.
     assert_eq!(0, Pgrx::confidence(tmp.as_ref()));
 
@@ -28,23 +34,26 @@ fn confidence() -> Result<(), BuildError> {
 fn new() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let cfg = PgConfig::from_map(HashMap::new());
-    let pipe = Pgrx::new(dir, cfg.clone());
-    assert_eq!(dir, pipe.dir);
-    assert_eq!(&dir, pipe.dir());
+    let exec = Executor::new(dir, LineWriter::new(vec![]), LineWriter::new(vec![]));
+    let mut pipe = Pgrx::new(exec, cfg.clone());
+    let exec = Executor::new(dir, LineWriter::new(vec![]), LineWriter::new(vec![]));
+    assert_eq!(&exec, pipe.executor());
     assert_eq!(&cfg, pipe.pg_config());
 
     let dir2 = dir.join("corpus");
     let cfg2 = PgConfig::from_map(HashMap::from([("bindir".to_string(), "bin".to_string())]));
-    let pipe = Pgrx::new(dir2.as_path(), cfg2.clone());
-    assert_eq!(dir2, pipe.dir);
-    assert_eq!(&dir2, pipe.dir());
+    let exec2 = Executor::new(&dir2, LineWriter::new(vec![]), LineWriter::new(vec![]));
+    let mut pipe = Pgrx::new(exec2, cfg2.clone());
+    let exec2 = Executor::new(&dir2, LineWriter::new(vec![]), LineWriter::new(vec![]));
+    assert_eq!(&exec2, pipe.executor());
     assert_eq!(&cfg2, pipe.pg_config());
 }
 
 #[test]
 fn configure_et_al() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let pipe = Pgrx::new(dir, PgConfig::from_map(HashMap::new()));
+    let exec = Executor::new(dir, LineWriter::new(vec![]), LineWriter::new(vec![]));
+    let mut pipe = Pgrx::new(exec, PgConfig::from_map(HashMap::new()));
     assert!(pipe.configure().is_ok());
     assert!(pipe.compile().is_ok());
     assert!(pipe.test().is_ok());

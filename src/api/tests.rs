@@ -863,6 +863,20 @@ fn meta() -> Result<(), BuildError> {
 }
 
 #[test]
+fn api_meta() -> Result<(), BuildError> {
+    let url = format!("file://{}/", corpus_dir().display());
+    let api = Api::new(&url, None)?;
+    let v = Version::parse("0.1.2").unwrap();
+    let dist = api.meta("api", &v)?;
+    assert_eq!("pair", dist.name());
+    assert_eq!(&v, dist.version());
+    let sha = dist.release().digests().sha1().unwrap();
+    assert_eq!("9988d7adb056b11f8576db44cca30f88a08bd652", hex::encode(sha));
+
+    Ok(())
+}
+
+#[test]
 fn meta_err() -> Result<(), BuildError> {
     // Start a lightweight mock server.
     let server = MockServer::start();

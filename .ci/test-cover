@@ -12,21 +12,19 @@ export LLVM_PROFILE_FILE="${DESTDIR}/default_%m_%p.profraw"
 cargo test
 
 grcov "${DESTDIR}" \
-    --ignore '**/clang-sys*/**' \
-    --ignore "$HOME/.cargo/**" \
-    --ignore-not-existing \
-    --ignore '**/tests/**' \
-    --ignore 'build.rs' \
-    --ignore 'target/**' \
-    --excl-start '#(\[cfg\(test\)\]|\[test\])' \
-    --excl-line 'unreachable\!\(' \
+    --keep-only 'src/**' \
+    --ignore 'src/tests/**' \
+    --ignore 'src/**/tests.rs' \
+    --excl-line 'unreachable!' \
     --llvm \
     --binary-path "target/debug/" \
     -s . \
     --branch \
     -o "${DESTDIR}" \
     --token 5DOLLPIHEO \
-    --output-types html,coveralls
+    --output-types html,coveralls,markdown
+
+cat "${DESTDIR}/markdown.md"
 
 if [ "$(uname -o)" = "Darwin" ] && [ -z "$CI" ]; then
 	open "${DESTDIR}/html/index.html"

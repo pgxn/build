@@ -1,7 +1,7 @@
 use crate::{exec::Executor, line::LineWriter};
 
 use super::*;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::{collections::HashMap, fs::File, io::Write, path::PathBuf, process::Command};
 use tempfile::tempdir;
 

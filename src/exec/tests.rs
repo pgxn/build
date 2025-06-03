@@ -63,6 +63,7 @@ fn execute() -> Result<(), BuildError> {
     let stdout = line::LineWriter::new(out);
     let stderr = line::LineWriter::new(err);
     let mut exec = Executor::new(tmp.as_ref(), stdout, stderr);
+    assert_ne!("", format!("{:?}", exec));
     match exec.execute(Command::new("__nonesuch_nope__")) {
         Ok(_) => panic!("Nonexistent file unexpectedly succeeded"),
         Err(e) => {

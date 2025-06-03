@@ -9,32 +9,32 @@ readme = "README.md"
 keywords = ["pgxn", "postgres", "postgresql", "extension", "validation"]
 license = "PostgreSQL"
 categories = ["web-programming", "database"]
-edition = "2021"
+edition = "2024"
 exclude = [ ".github", ".vscode", ".gitignore", ".ci", ".pre-*.yaml"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 cargo_toml = "0.22.1"
-chrono = "0.4.40"
+chrono = "0.4.41"
 hex = "0.4.3"
 iri-string = "0.7.8"
-log = { version = "0.4.26", features = ["kv"] }
-owo-colors = "4.2.0"
-pgxn_meta = "0.6.0"
+log = { version = "0.4.27", features = ["kv"] }
+owo-colors = "4.2.1"
+pgxn_meta = "0.7.0"
 regex = "1.11.1"
 semver = "1.0.26"
 serde = "1.0.219"
 serde_json = "1.0.140"
 supports-color = "3.0.2"
-tempfile = "3.19.1"
+tempfile = "3.20.0"
 thiserror = "2.0.12"
-ureq = { version = "3.0.10", features = ["json"] }
+ureq = { version = "3.0.11", features = ["json"] }
 url = "2.5.4"
-zip = "2.4.2"
+zip = "4.0.0"
 
 [dev-dependencies]
 httpmock = "0.7.0"
-sha2 = "0.10.8"
+sha2 = "0.10.9"
 temp-env = "0.3.6"
-assertables = "9.5.1"
+assertables = "9.5.5"

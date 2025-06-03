@@ -141,7 +141,10 @@ fn download_http() -> Result<(), BuildError> {
     let res = api.download_to(tmp_dir.as_ref(), &meta);
     mock.assert();
     assert!(res.is_err());
-    assert_eq!("SHA-1 digest cafa55f06cdc9861b23de72687024b02322ad21c does not match 5b9e3ba948b18703227e4dea17696c0f1d971759", res.unwrap_err().to_string());
+    assert_eq!(
+        "SHA-1 digest cafa55f06cdc9861b23de72687024b02322ad21c does not match 5b9e3ba948b18703227e4dea17696c0f1d971759",
+        res.unwrap_err().to_string()
+    );
 
     Ok(())
 }
@@ -924,10 +927,11 @@ fn meta_err() -> Result<(), BuildError> {
     let meta = api.meta("invalid_meta", &v);
     mock.assert();
     assert!(meta.is_err());
-    assert!(meta
-        .unwrap_err()
-        .to_string()
-        .contains("missing properties 'name', 'version', 'abstract'"));
+    assert!(
+        meta.unwrap_err()
+            .to_string()
+            .contains("missing properties 'name', 'version', 'abstract'")
+    );
 
     Ok(())
 }

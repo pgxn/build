@@ -1,3 +1,4 @@
+export RUSTFLAGS := -D warnings
 .PHONY: test # Run the full test suite.
 test:
 	@cargo test
@@ -20,9 +21,9 @@ docs: target/doc/pgxn_build/index.html
 
 .PHONY: update-deps # Update dependencies to the latest versions.
 update-deps:
+	@cargo install cargo-edit
 	@cargo upgrade -i allow --recursive true
-	@cargo update
-	@cargo update
+	@cargo update --recursive
 
 target/doc/pgxn_build/index.html: $(shell find . -name \*.rs)
 	cargo doc

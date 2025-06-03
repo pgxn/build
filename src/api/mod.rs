@@ -8,10 +8,10 @@ pub use dist::Dist;
 
 use crate::error::BuildError;
 use iri_string::spec;
-use iri_string::template::{simple_context::SimpleContext, UriTemplateStr, UriTemplateString};
+use iri_string::template::{UriTemplateStr, UriTemplateString, simple_context::SimpleContext};
 use log::{debug, info, trace};
 use semver::Version;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::{
     collections::HashMap,
     fs::File,
@@ -169,10 +169,10 @@ impl Api {
         // Extract the file name from the URL.
         match url.path_segments() {
             None => Err(BuildError::NoUrlFile(url))?,
-            Some(segments) => {
+            Some(mut segments) => {
                 // When Some is returned, the iterator always contains at
                 // least one string (which may be empty).
-                let filename = segments.last().unwrap();
+                let filename = segments.next_back().unwrap();
                 if filename.is_empty() {
                     return Err(BuildError::NoUrlFile(url));
                 }

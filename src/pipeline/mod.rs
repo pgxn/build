@@ -3,18 +3,35 @@
 use crate::exec::Executor;
 use crate::{error::BuildError, pg_config::PgConfig};
 use log::debug;
+use std::collections::HashMap;
 use std::{io::Write, path::Path, process::Command};
+
+/// Context determined for the pipeline by [`Pipeline::evaluate`].
+pub(crate) struct Context {
+    // The score for the confidence that this pipeline can build the
+    /// contents of `dir`. A score of 0 means no confidence and 255 means the
+    /// highest confidence.
+    pub score: u8,
+
+    /// Configuration data collected during evaluation.
+    pub config: HashMap<String, String>,
+
+    /// Optional error to raise if the pipeline has the highest confidence but
+    /// cannot be built.
+    pub err: Option<BuildError>,
+}
 
 /// Defines the interface for build pipelines to configure, compile, and test
 /// PGXN distributions.
 pub(crate) trait Pipeline {
-    /// Creates an instance of a Pipeline.
-    fn new(exec: Executor, pg_config: PgConfig) -> Self;
+    /// Creates an instance of a Pipeline. Pass the [`Context`] returned by
+    /// [`Pipeline::evaluate`].
+    fn new(exec: Executor, pg_config: PgConfig, ctx: Context) -> Self;
 
-    /// Returns a score for the confidence that this pipeline can build the
-    /// contents of `dir`. A score of 0 means no confidence and 255 means the
-    /// highest confidence.
-    fn confidence(dir: impl AsRef<Path>) -> u8;
+    /// Evaluates the pipeline to determine whether it's likely to be able to
+    /// build the contents of `dir`. Returns a [`Context`] with a confidence
+    /// level and configuration to be passed to [`Pipeline::new`].
+    fn evaluate(dir: impl AsRef<Path>) -> Context;
 
     /// Configures a distribution to build on a particular platform and
     /// Postgres version.
@@ -29,10 +46,10 @@ pub(crate) trait Pipeline {
     /// Tests a distribution a particular platform and Postgres version.
     fn test(&mut self) -> Result<(), BuildError>;
 
-    /// Returns the Executor passed to [`new`].
+    /// Returns the Executor passed to [`Pipeline::new`].
     fn executor(&mut self) -> &mut Executor;
 
-    /// Returns the PgConfig passed to [`new`].
+    /// Returns the PgConfig passed to [`Pipeline::new`].
     fn pg_config(&self) -> &PgConfig;
 
     // maybe_sudo returns a Command that starts with the sudo command if

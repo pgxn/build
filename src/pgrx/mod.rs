@@ -2,8 +2,10 @@
 //!
 //! [pgrx]: https://github.com/pgcentralfoundation/pgrx
 
-use crate::pipeline::Pipeline;
+use crate::pipeline::{Context, Pipeline};
 use crate::{error::BuildError, exec::Executor, pg_config::PgConfig};
+use cargo_toml::Manifest;
+use std::collections::HashMap;
 use std::path::Path;
 
 /// Builder implementation for [pgrx] Pipelines.
@@ -13,11 +15,16 @@ use std::path::Path;
 pub(crate) struct Pgrx {
     exec: Executor,
     cfg: PgConfig,
+    pkg: String,
 }
 
 impl Pipeline for Pgrx {
-    fn new(exec: Executor, cfg: PgConfig) -> Self {
-        Pgrx { exec, cfg }
+    fn new(exec: Executor, cfg: PgConfig, ctx: Context) -> Self {
+        Pgrx {
+            exec,
+            cfg,
+            pkg: ctx.config.get("package").unwrap().to_string(),
+        }
     }
 
     /// Returns the Executor passed to [`Self::new`].
@@ -34,28 +41,56 @@ impl Pipeline for Pgrx {
     /// contents of `dir`. Returns 255 if it contains a file named
     /// `Cargo.toml` and lists pgrx as a dependency. Otherwise returns 1 if
     /// `Cargo.toml` exists and 0 if it does not.
-    fn confidence(dir: impl AsRef<Path>) -> u8 {
+    fn evaluate(dir: impl AsRef<Path>) -> Context {
         let file = dir.as_ref().join("Cargo.toml");
         if !file.exists() {
-            return 0;
+            return Context {
+                score: 0,
+                config: HashMap::with_capacity(0),
+                err: None,
+            };
         }
 
-        // Does Cargo.toml mention pgrx?
+        // Load cargo.toml.
         if let Ok(cargo) = cargo_toml::Manifest::from_path(file) {
-            if cargo.dependencies.contains_key("pgrx") {
-                // Full confidence
-                return 255;
-            }
-            if let Some(work) = cargo.workspace {
-                if work.dependencies.contains_key("pgrx") {
-                    // Strong confidence
-                    return 254;
+            // Determine the score
+            let score = get_score(&cargo);
+
+            if score > 0 {
+                // Determine the package.
+                if let Some(pkg) = cargo.package {
+                    return Context {
+                        score,
+                        config: HashMap::from([("package".to_string(), pkg.name)]),
+                        err: None,
+                    };
                 }
+
+                // Is it a workspace?
+                if let Some(work) = cargo.workspace {
+                    if !work.members.is_empty() {
+                        // XXX Look for pgrx in each member?
+                        return Context {
+                            score,
+                            config: HashMap::with_capacity(0),
+                            err: Some(BuildError::SelectPackage(work.members)),
+                        };
+                    }
+                }
+                return Context {
+                    score,
+                    config: HashMap::with_capacity(0),
+                    err: Some(BuildError::NoPackage()),
+                };
             }
         }
 
         // Have Cargo.toml but no dependence on pgrx. Weak confidence.
-        1
+        Context {
+            score: 1,
+            config: HashMap::with_capacity(0),
+            err: None,
+        }
     }
 
     /// Runs `cargo init`.
@@ -77,6 +112,22 @@ impl Pipeline for Pgrx {
     fn install(&mut self) -> Result<(), BuildError> {
         Ok(())
     }
+}
+
+fn get_score(cargo: &Manifest) -> u8 {
+    if cargo.dependencies.contains_key("pgrx") {
+        // Full confidence
+        return 255;
+    }
+
+    if let Some(work) = &cargo.workspace {
+        if work.dependencies.contains_key("pgrx") {
+            // Full confidence
+            return 255;
+        }
+    }
+
+    return 0;
 }
 
 #[cfg(test)]

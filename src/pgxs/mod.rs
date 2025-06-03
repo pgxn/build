@@ -2,9 +2,15 @@
 //!
 //! [PGXS]: https://www.postgresql.org/docs/current/extend-pgxs.html
 
-use crate::{error::BuildError, exec::Executor, pg_config::PgConfig, pipeline::Pipeline};
+use crate::{
+    error::BuildError,
+    exec::Executor,
+    pg_config::PgConfig,
+    pipeline::{Context, Pipeline},
+};
 use log::{debug, info};
 use regex::Regex;
+use std::collections::HashMap;
 use std::{
     fs::{self, File},
     io::{BufRead, BufReader},
@@ -21,7 +27,7 @@ pub(crate) struct Pgxs {
 }
 
 impl Pipeline for Pgxs {
-    fn new(exec: Executor, cfg: PgConfig) -> Self {
+    fn new(exec: Executor, cfg: PgConfig, _: Context) -> Self {
         Pgxs { exec, cfg }
     }
 
@@ -33,10 +39,16 @@ impl Pipeline for Pgxs {
     /// *   Returns 200 if it declares variables named `MODULES`,
     ///     `MODULE_big`, `PROGRAM`, `EXTENSION`, `DATA`, or `DATA_built`
     /// *   Otherwise returns 127
-    fn confidence(dir: impl AsRef<Path>) -> u8 {
+    fn evaluate(dir: impl AsRef<Path>) -> Context {
         let file = match makefile(dir.as_ref()) {
             Some(f) => f,
-            None => return 0,
+            None => {
+                return Context {
+                    score: 0,
+                    config: HashMap::with_capacity(0),
+                    err: None,
+                };
+            }
         };
 
         // https://www.postgresql.org/docs/current/extend-pgxs.html
@@ -51,17 +63,19 @@ impl Pipeline for Pgxs {
             for line in reader.lines().map_while(Result::ok) {
                 if pgc_rx.is_match(&line) {
                     // Full confidence
-                    return 255;
-                }
-                if var_rx.is_match(&line) {
+                    score = 255;
+                } else if var_rx.is_match(&line) {
                     // Probably
                     score = 200;
                 }
             }
         }
 
-        // Probably can do `make all && make install`, probably not `installcheck`.
-        score
+        Context {
+            score,
+            config: HashMap::with_capacity(0),
+            err: None,
+        }
     }
 
     /// Returns the Executor passed to [`Self::new`].

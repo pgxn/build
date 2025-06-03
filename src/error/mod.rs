@@ -76,6 +76,14 @@ pub enum BuildError {
     /// Command execution failure.
     #[error("executing `{0}`: {1}")]
     Command(String, String),
+
+    /// No Rust package found.
+    #[error("no package found in Cargo.toml")]
+    NoPackage(),
+
+    /// Specify package from workspace list.
+    #[error("specify --package to build; options:\n{  - }", 0.join("\n  - "))]
+    SelectPackage(Vec<String>),
 }
 
 impl From<ureq::Error> for BuildError {

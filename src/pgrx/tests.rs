@@ -18,6 +18,15 @@ fn confidence() -> Result<(), BuildError> {
     let mut file = File::create(tmp.as_ref().join("Cargo.toml"))?;
     assert_eq!(1, Pgrx::confidence(tmp.as_ref()));
 
+    // Add a workspace pgrx dependency.
+    writeln!(&file, "[workspace.dependencies]\npgrx = \"0.12.6\"")?;
+    file.flush().unwrap();
+    assert_eq!(254, Pgrx::confidence(tmp.as_ref()));
+
+    // Add another dependency (to be ignored).
+    writeln!(&file, "boon = \"0.6.1\"")?;
+    assert_eq!(254, Pgrx::confidence(tmp.as_ref()));
+
     // Add a pgrx dependency.
     writeln!(&file, "[dependencies]\npgrx = \"0.12.6\"")?;
     file.flush().unwrap();

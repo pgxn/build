@@ -46,6 +46,12 @@ impl Pipeline for Pgrx {
                 // Full confidence
                 return 255;
             }
+            if let Some(work) = cargo.workspace {
+                if work.dependencies.contains_key("pgrx") {
+                    // Strong confidence
+                    return 254;
+                }
+            }
         }
 
         // Have Cargo.toml but no dependence on pgrx. Weak confidence.

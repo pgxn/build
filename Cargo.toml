@@ -15,26 +15,26 @@ exclude = [ ".github", ".vscode", ".gitignore", ".ci", ".pre-*.yaml"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cargo_toml = "0.22.1"
-chrono = "0.4.41"
+cargo_toml = "0.22.3"
+chrono = "0.4.43"
 hex = "0.4.3"
-iri-string = "0.7.8"
-log = { version = "0.4.27", features = ["kv"] }
-owo-colors = "4.2.1"
+iri-string = "0.7.10"
+log = { version = "0.4.29", features = ["kv"] }
+owo-colors = "4.2.3"
 pgxn_meta = "0.7.0"
-regex = "1.11.1"
-semver = "1.0.26"
-serde = "1.0.219"
-serde_json = "1.0.140"
+regex = "1.12.3"
+semver = "1.0.27"
+serde = "1.0.228"
+serde_json = "1.0.149"
 supports-color = "3.0.2"
-tempfile = "3.20.0"
-thiserror = "2.0.12"
-ureq = { version = "3.0.11", features = ["json"] }
-url = "2.5.4"
-zip = "4.0.0"
+tempfile = "3.24.0"
+thiserror = "2.0.18"
+ureq = { version = "3.1.4", features = ["json"] }
+url = "2.5.8"
+zip = "7.3.0"
 
 [dev-dependencies]
-httpmock = "0.7.0"
+httpmock = "0.8.3"
 sha2 = "0.10.9"
 temp-env = "0.3.6"
-assertables = "9.5.5"
+assertables = "9.8.4"

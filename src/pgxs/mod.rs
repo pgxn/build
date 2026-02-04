@@ -76,13 +76,13 @@ impl Pipeline for Pgxs {
 
     fn configure(&mut self) -> Result<(), BuildError> {
         // Run configure if it exists.
-        if let Ok(ok) = fs::exists(self.exec.dir().join("configure")) {
-            if ok {
-                info!("running configure");
-                // "." will not work on VMS or MacOS Classic.
-                let cmd = Path::new(".").join("configure").display().to_string();
-                return self.run(&cmd, [""; 0], false);
-            }
+        if let Ok(ok) = fs::exists(self.exec.dir().join("configure"))
+            && ok
+        {
+            info!("running configure");
+            // "." will not work on VMS or MacOS Classic.
+            let cmd = Path::new(".").join("configure").display().to_string();
+            return self.run(&cmd, [""; 0], false);
         }
 
         Ok(())

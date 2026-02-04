@@ -33,10 +33,10 @@ impl PgConfig {
         let mut cfg = HashMap::new();
         for line in reader.lines().map_while(Result::ok) {
             let mut split = line.splitn(2, " = ");
-            if let Some(key) = split.nth(0) {
-                if let Some(val) = split.last() {
-                    cfg.insert(key.to_ascii_lowercase(), val.to_string());
-                }
+            if let Some(key) = split.nth(0)
+                && let Some(val) = split.last()
+            {
+                cfg.insert(key.to_ascii_lowercase(), val.to_string());
             }
         }
 

@@ -39,14 +39,13 @@ pub(crate) trait Pipeline {
     // `sudo` is true and the `pkglibdir` returned by pg_config isn't
     // writeable by the current user.
     fn maybe_sudo(&self, program: &str, sudo: bool) -> Command {
-        if sudo {
-            if let Some(dir) = self.pg_config().get("pkglibdir") {
-                if !self.is_writeable(dir) {
-                    let mut c = Command::new("sudo");
-                    c.arg(program);
-                    return c;
-                }
-            }
+        if sudo
+            && let Some(dir) = self.pg_config().get("pkglibdir")
+            && !self.is_writeable(dir)
+        {
+            let mut c = Command::new("sudo");
+            c.arg(program);
+            return c;
         }
         Command::new(program)
     }

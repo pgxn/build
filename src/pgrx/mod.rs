@@ -41,11 +41,11 @@ impl Pipeline for Pgrx {
         }
 
         // Does Cargo.toml mention pgrx?
-        if let Ok(cargo) = cargo_toml::Manifest::from_path(file) {
-            if cargo.dependencies.contains_key("pgrx") {
-                // Full confidence
-                return 255;
-            }
+        if let Ok(cargo) = cargo_toml::Manifest::from_path(file)
+            && cargo.dependencies.contains_key("pgrx")
+        {
+            // Full confidence
+            return 255;
         }
 
         // Have Cargo.toml but no dependence on pgrx. Weak confidence.
